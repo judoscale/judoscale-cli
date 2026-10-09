@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 func newTestClient(t *testing.T, h http.HandlerFunc) *Client {
@@ -16,6 +17,7 @@ func newTestClient(t *testing.T, h http.HandlerFunc) *Client {
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 	c := New(srv.URL+"/", "jdo_test")
+	c.sleep = func(context.Context, time.Duration) error { return nil }
 	return c
 }
 
@@ -81,6 +83,69 @@ func TestDoNonEnvelopeError(t *testing.T) {
 	_, err := c.Do(context.Background(), "GET", "/v1/apps", nil, nil)
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) || apiErr.Status != 502 || apiErr.Type != "http_error" {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestDoRetriesOn429WithRetryAfter(t *testing.T) {
+	calls := 0
+	var waits []time.Duration
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls < 3 {
+			w.Header().Set("Retry-After", "7")
+			w.WriteHeader(http.StatusTooManyRequests)
+			w.Write([]byte(`{"error":{"type":"rate_limit_error","message":"slow down"}}`))
+			return
+		}
+		b, _ := io.ReadAll(r.Body)
+		if string(b) != `{"a":1}` {
+			t.Errorf("body on retry = %q", b)
+		}
+		w.Write([]byte(`{}`))
+	})
+	c.sleep = func(_ context.Context, d time.Duration) error { waits = append(waits, d); return nil }
+	var notified int
+	c.OnRetry = func(time.Duration) { notified++ }
+
+	if _, err := c.Do(context.Background(), "POST", "/v1/x", nil, []byte(`{"a":1}`)); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 3 || len(waits) != 2 || waits[0] != 7*time.Second || notified != 2 {
+		t.Errorf("calls=%d waits=%v notified=%d", calls, waits, notified)
+	}
+}
+
+func TestDoGivesUpAfterMaxRetries(t *testing.T) {
+	calls := 0
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Header().Set("Retry-After", "1")
+		w.WriteHeader(http.StatusTooManyRequests)
+		w.Write([]byte(`{"error":{"type":"rate_limit_error","message":"slow down"}}`))
+	})
+
+	_, err := c.Do(context.Background(), "GET", "/v1/apps", nil, nil)
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) || apiErr.Type != "rate_limit_error" {
+		t.Fatalf("err = %v", err)
+	}
+	if calls != maxRetries+1 {
+		t.Errorf("calls = %d", calls)
+	}
+}
+
+func TestDoRetryAbortsOnContextCancel(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "60")
+		w.WriteHeader(http.StatusTooManyRequests)
+	})
+	c.sleep = sleep
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	_, err := c.Do(ctx, "GET", "/v1/apps", nil, nil)
+	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("err = %v", err)
 	}
 }

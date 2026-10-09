@@ -9,12 +9,14 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
 
 const (
 	DefaultBaseURL = "https://api.judoscale.com"
+	maxRetries     = 3
 	maxBodyBytes   = 32 << 20
 )
 
@@ -39,6 +41,11 @@ type Client struct {
 	Token     string
 	UserAgent string
 	HTTP      *http.Client
+
+	// OnRetry is called before sleeping on a 429.
+	OnRetry func(wait time.Duration)
+
+	sleep func(context.Context, time.Duration) error
 }
 
 func New(baseURL, token string) *Client {
@@ -50,25 +57,39 @@ func New(baseURL, token string) *Client {
 		Token:     token,
 		UserAgent: "judoscale-cli",
 		HTTP:      &http.Client{Timeout: 60 * time.Second},
+		sleep:     sleep,
 	}
 }
 
 // Do sends a request and returns the response body. path may include a query
 // string; query is merged on top. Non-2xx responses return an *APIError.
+// A 429 is retried after the Retry-After delay.
 func (c *Client) Do(ctx context.Context, method, path string, query url.Values, body []byte) ([]byte, error) {
 	u, err := c.buildURL(path, query)
 	if err != nil {
 		return nil, err
 	}
 
-	respBody, status, err := c.send(ctx, method, u, body)
-	if err != nil {
-		return nil, err
+	for attempt := 0; ; attempt++ {
+		respBody, status, header, err := c.send(ctx, method, u, body)
+		if err != nil {
+			return nil, err
+		}
+		if status == http.StatusTooManyRequests && attempt < maxRetries {
+			wait := retryAfter(header, attempt)
+			if c.OnRetry != nil {
+				c.OnRetry(wait)
+			}
+			if err := c.sleep(ctx, wait); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		if status >= 200 && status < 300 {
+			return respBody, nil
+		}
+		return nil, parseError(status, respBody)
 	}
-	if status >= 200 && status < 300 {
-		return respBody, nil
-	}
-	return nil, parseError(status, respBody)
 }
 
 func (c *Client) buildURL(path string, query url.Values) (string, error) {
@@ -90,14 +111,14 @@ func (c *Client) buildURL(path string, query url.Values) (string, error) {
 	return u.String(), nil
 }
 
-func (c *Client) send(ctx context.Context, method, u string, body []byte) ([]byte, int, error) {
+func (c *Client) send(ctx context.Context, method, u string, body []byte) ([]byte, int, http.Header, error) {
 	var r io.Reader
 	if body != nil {
 		r = bytes.NewReader(body)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, u, r)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", c.UserAgent)
@@ -110,14 +131,14 @@ func (c *Client) send(ctx context.Context, method, u string, body []byte) ([]byt
 
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
 	defer resp.Body.Close()
 	b, err := io.ReadAll(io.LimitReader(resp.Body, maxBodyBytes))
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
-	return b, resp.StatusCode, nil
+	return b, resp.StatusCode, resp.Header, nil
 }
 
 func parseError(status int, body []byte) *APIError {
@@ -132,4 +153,23 @@ func parseError(status int, body []byte) *APIError {
 		return &APIError{Status: status, Type: env.Error.Type, Message: env.Error.Message, Param: env.Error.Param}
 	}
 	return &APIError{Status: status, Type: "http_error", Message: fmt.Sprintf("%d %s", status, http.StatusText(status))}
+}
+
+// retryAfter reads Retry-After seconds, falling back to a short backoff.
+func retryAfter(h http.Header, attempt int) time.Duration {
+	if s, err := strconv.Atoi(strings.TrimSpace(h.Get("Retry-After"))); err == nil && s >= 0 {
+		return time.Duration(s) * time.Second
+	}
+	return time.Duration(attempt+1) * time.Second
+}
+
+func sleep(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
 }
