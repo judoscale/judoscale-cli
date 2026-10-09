@@ -56,6 +56,9 @@ func TestAPICommand(t *testing.T) {
 		if r.Method != "GET" || r.URL.Path != "/v1/apps" || r.Header.Get("Authorization") != "Bearer jdo_test" {
 			t.Errorf("%s %s %q", r.Method, r.URL, r.Header.Get("Authorization"))
 		}
+		if got := r.Header.Get("User-Agent"); got != "judoscale-cli/dev" {
+			t.Errorf("User-Agent = %q", got)
+		}
 		w.Write([]byte(`{"apps":[]}`))
 	})
 
