@@ -156,3 +156,53 @@ func TestDoRejectsRelativePath(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestGetAllFollowsCursor(t *testing.T) {
+	var cursors []string
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		cursors = append(cursors, r.URL.Query().Get("cursor"))
+		if r.URL.Query().Get("from") != "2026-01-01" {
+			t.Errorf("from not repeated on %s", r.URL)
+		}
+		switch r.URL.Query().Get("cursor") {
+		case "":
+			w.Write([]byte(`{"scale_events":[{"id":1},{"id":2}],"next_cursor":"c2"}`))
+		case "c2":
+			w.Write([]byte(`{"scale_events":[{"id":3}],"next_cursor":"c3"}`))
+		default:
+			w.Write([]byte(`{"scale_events":[{"id":4}]}`))
+		}
+	})
+
+	body, err := c.GetAll(context.Background(), "/v1/processes/1/scale_events", url.Values{"from": {"2026-01-01"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != `{"scale_events":[{"id":1},{"id":2},{"id":3},{"id":4}]}` {
+		t.Errorf("body = %s", body)
+	}
+	if strings.Join(cursors, ",") != ",c2,c3" {
+		t.Errorf("cursors = %v", cursors)
+	}
+}
+
+func TestGetAllSinglePage(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"restart_events":[]}`))
+	})
+
+	body, err := c.GetAll(context.Background(), "/v1/x", nil)
+	if err != nil || string(body) != `{"restart_events":[]}` {
+		t.Fatalf("body=%s err=%v", body, err)
+	}
+}
+
+func TestGetAllStopsOnRepeatedCursor(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"items":[1],"next_cursor":"same"}`))
+	})
+
+	if _, err := c.GetAll(context.Background(), "/v1/x", nil); err == nil || !strings.Contains(err.Error(), "did not advance") {
+		t.Fatalf("err = %v", err)
+	}
+}

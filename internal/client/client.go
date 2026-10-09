@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -90,6 +91,67 @@ func (c *Client) Do(ctx context.Context, method, path string, query url.Values, 
 		}
 		return nil, parseError(status, respBody)
 	}
+}
+
+// GetAll fetches every page of a paginated GET endpoint, following next_cursor,
+// and returns one object whose array fields are concatenated across pages.
+func (c *Client) GetAll(ctx context.Context, path string, query url.Values) ([]byte, error) {
+	q := url.Values{}
+	for k, v := range query {
+		q[k] = v
+	}
+
+	var merged map[string]json.RawMessage
+	for {
+		body, err := c.Do(ctx, http.MethodGet, path, q, nil)
+		if err != nil {
+			return nil, err
+		}
+		var page map[string]json.RawMessage
+		if err := json.Unmarshal(body, &page); err != nil {
+			return nil, fmt.Errorf("paginated response is not a JSON object: %w", err)
+		}
+
+		var next string
+		if raw, ok := page["next_cursor"]; ok {
+			_ = json.Unmarshal(raw, &next)
+		}
+		delete(page, "next_cursor")
+
+		if merged == nil {
+			merged = page
+		} else if err := appendArrays(merged, page); err != nil {
+			return nil, err
+		}
+
+		if next == "" {
+			break
+		}
+		if next == q.Get("cursor") {
+			return nil, errors.New("pagination did not advance: next_cursor repeated")
+		}
+		q.Set("cursor", next)
+	}
+	return json.Marshal(merged)
+}
+
+func appendArrays(dst, src map[string]json.RawMessage) error {
+	for k, raw := range src {
+		var items []json.RawMessage
+		if json.Unmarshal(raw, &items) != nil {
+			continue
+		}
+		var existing []json.RawMessage
+		if err := json.Unmarshal(dst[k], &existing); err != nil {
+			continue
+		}
+		b, err := json.Marshal(append(existing, items...))
+		if err != nil {
+			return err
+		}
+		dst[k] = b
+	}
+	return nil
 }
 
 func (c *Client) buildURL(path string, query url.Values) (string, error) {
