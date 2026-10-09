@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -57,13 +58,18 @@ func New(baseURL, token string) *Client {
 		BaseURL:   strings.TrimRight(baseURL, "/"),
 		Token:     token,
 		UserAgent: "judoscale-cli",
-		HTTP:      &http.Client{Timeout: 60 * time.Second},
-		sleep:     sleep,
+		HTTP: &http.Client{
+			Timeout: 60 * time.Second,
+			// The API never redirects; following one could also turn a write into a GET.
+			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+		},
+		sleep: sleep,
 	}
 }
 
 // Do sends a request and returns the response body. path may include a query
-// string; query is merged on top. Non-2xx responses return an *APIError.
+// string; query is merged on top. Non-2xx responses, redirects and non-JSON
+// success responses are errors; API errors are returned as *APIError.
 // A 429 is retried after the Retry-After delay.
 func (c *Client) Do(ctx context.Context, method, path string, query url.Values, body []byte) ([]byte, error) {
 	u, err := c.buildURL(path, query)
@@ -87,7 +93,13 @@ func (c *Client) Do(ctx context.Context, method, path string, query url.Values, 
 			continue
 		}
 		if status >= 200 && status < 300 {
+			if err := checkJSON(respBody, header); err != nil {
+				return nil, fmt.Errorf("unexpected response from %s: %w", u, err)
+			}
 			return respBody, nil
+		}
+		if status >= 300 && status < 400 {
+			return nil, redirectError(status, header)
 		}
 		return nil, parseError(status, respBody)
 	}
@@ -215,6 +227,28 @@ func parseError(status int, body []byte) *APIError {
 		return &APIError{Status: status, Type: env.Error.Type, Message: env.Error.Message, Param: env.Error.Param}
 	}
 	return &APIError{Status: status, Type: "http_error", Message: fmt.Sprintf("%d %s", status, http.StatusText(status))}
+}
+
+func redirectError(status int, h http.Header) *APIError {
+	msg := fmt.Sprintf("%d %s", status, http.StatusText(status))
+	if loc := h.Get("Location"); loc != "" {
+		msg += ", redirected to " + loc
+	}
+	return &APIError{Status: status, Type: "http_error", Message: msg}
+}
+
+// checkJSON rejects a non-empty body that isn't declared as JSON, such as an
+// HTML page from a wrong base URL or a proxy.
+func checkJSON(body []byte, h http.Header) error {
+	if len(bytes.TrimSpace(body)) == 0 {
+		return nil
+	}
+	ct := h.Get("Content-Type")
+	mt, _, err := mime.ParseMediaType(ct)
+	if err != nil || (mt != "application/json" && !strings.HasSuffix(mt, "+json")) {
+		return fmt.Errorf("expected JSON, got content type %q", ct)
+	}
+	return nil
 }
 
 // retryAfter reads Retry-After seconds, falling back to a short backoff.

@@ -43,7 +43,10 @@ func runIn(t *testing.T, configDir string, srv *httptest.Server, env map[string]
 
 func server(t *testing.T, h http.HandlerFunc) *httptest.Server {
 	t.Helper()
-	srv := httptest.NewServer(h)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		h(w, r)
+	}))
 	t.Cleanup(srv.Close)
 	return srv
 }

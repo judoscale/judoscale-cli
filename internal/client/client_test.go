@@ -14,7 +14,10 @@ import (
 
 func newTestClient(t *testing.T, h http.HandlerFunc) *Client {
 	t.Helper()
-	srv := httptest.NewServer(h)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		h(w, r)
+	}))
 	t.Cleanup(srv.Close)
 	c := New(srv.URL+"/", "jdo_test")
 	c.sleep = func(context.Context, time.Duration) error { return nil }
@@ -204,5 +207,54 @@ func TestGetAllStopsOnRepeatedCursor(t *testing.T) {
 
 	if _, err := c.GetAll(context.Background(), "/v1/x", nil); err == nil || !strings.Contains(err.Error(), "did not advance") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestDoDoesNotFollowRedirects(t *testing.T) {
+	hits := 0
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		http.Redirect(w, r, "/docs", http.StatusFound)
+	})
+
+	_, err := c.Do(context.Background(), "POST", "/v1/apps", nil, []byte(`{}`))
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) || apiErr.Status != 302 || !strings.Contains(apiErr.Message, "redirected to /docs") {
+		t.Fatalf("err = %v", err)
+	}
+	if hits != 1 {
+		t.Errorf("hits = %d", hits)
+	}
+}
+
+func TestDoRejectsNonJSONSuccess(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte("<!doctype html>"))
+	})
+
+	_, err := c.Do(context.Background(), "GET", "/v1/apps", nil, nil)
+	if err == nil || !strings.Contains(err.Error(), "expected JSON") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestDoAcceptsJSONVariantsAndEmptyBodies(t *testing.T) {
+	for _, ct := range []string{"application/json; charset=utf-8", "application/problem+json"} {
+		c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", ct)
+			w.Write([]byte(`{}`))
+		})
+		if _, err := c.Do(context.Background(), "GET", "/v1/x", nil, nil); err != nil {
+			t.Errorf("%s: %v", ct, err)
+		}
+	}
+
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Del("Content-Type")
+		w.WriteHeader(http.StatusNoContent)
+	})
+	if _, err := c.Do(context.Background(), "DELETE", "/v1/x", nil, nil); err != nil {
+		t.Errorf("204: %v", err)
 	}
 }
