@@ -13,11 +13,12 @@ import (
 const miniSpec = `{
   "openapi": "3.2.0",
   "x-min-cli-version": "%s",
+  "tags": [{"name": "Things"}, {"name": "Parts"}],
   "paths": {
     "/v1/things/{id}/parts/{part}": {
       "parameters": [{"name": "id", "in": "path", "required": true}],
       "get": {
-        "operationId": "getThingPart", "summary": "Get a part",
+        "operationId": "getThingPart", "summary": "Get a part", "tags": ["Parts", "Things"],
         "parameters": [
           {"name": "part", "in": "path", "required": true},
           {"name": "to", "in": "query", "required": true, "description": "end"},
@@ -41,7 +42,13 @@ func TestParse(t *testing.T) {
 	if len(s.Operations) != 2 {
 		t.Fatalf("ops = %+v", s.Operations)
 	}
+	if len(s.Tags) != 2 || s.Tags[0] != "Things" || s.Tags[1] != "Parts" {
+		t.Errorf("tags = %v", s.Tags)
+	}
 	op := s.Operations[1] // sorted: deleteThingPart, getThingPart
+	if op.Tag != "Parts" || s.Operations[0].Tag != "" {
+		t.Errorf("tags: get=%q delete=%q", op.Tag, s.Operations[0].Tag)
+	}
 	if op.ID != "getThingPart" || op.Method != "GET" || op.Path != "/v1/things/{id}/parts/{part}" {
 		t.Errorf("op = %+v", op)
 	}

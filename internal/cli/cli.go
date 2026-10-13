@@ -10,9 +10,9 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/judoscale/judoscale-cli/internal/client"
@@ -137,20 +137,74 @@ Usage: judo <command> [arguments] [flags]
 Environment:
   JUDOSCALE_API_TOKEN  API token (required for API commands)
   JUDOSCALE_API_URL    API base URL (default https://api.judoscale.com)
-
-Commands:
 `)
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "  api\tMake a raw API request: api <METHOD> <path>")
-	fmt.Fprintln(tw, "  version\tPrint the CLI version")
+
+	groups := []helpGroup{{"General", []helpEntry{
+		{"api", "Make a raw API request: api <METHOD> <path>"},
+		{"version", "Print the CLI version"},
+	}}}
 	if s, err := a.loadSpec(); err == nil {
-		for _, op := range commandOps(s) {
-			fmt.Fprintf(tw, "  %s\t%s\n", commandName(op), op.Summary)
+		groups = append(groups, groupByTag(s)...)
+	}
+
+	width := 0
+	for _, g := range groups {
+		for _, e := range g.entries {
+			width = max(width, len(e.name))
 		}
 	}
-	tw.Flush()
+	for _, g := range groups {
+		fmt.Fprintf(w, "\n%s:\n", g.title)
+		for _, e := range g.entries {
+			fmt.Fprintf(w, "  %-*s  %s\n", width, e.name, e.summary)
+		}
+	}
 	fmt.Fprintln(w, "\nRun `judo <command> --help` for details.")
 	return nil
+}
+
+type helpEntry struct{ name, summary string }
+
+type helpGroup struct {
+	title   string
+	entries []helpEntry
+}
+
+// groupByTag sections the commands by operation tag, in the spec's tag order.
+// Tags the spec doesn't declare follow alphabetically, then untagged commands.
+func groupByTag(s *spec.Spec) []helpGroup {
+	byTag := map[string][]helpEntry{}
+	for _, op := range commandOps(s) {
+		byTag[op.Tag] = append(byTag[op.Tag], helpEntry{commandName(op), op.Summary})
+	}
+
+	var order []string
+	for _, t := range s.Tags {
+		if _, ok := byTag[t]; ok && t != "" {
+			order = append(order, t)
+		}
+	}
+	var rest []string
+	for t := range byTag {
+		if t != "" && !slices.Contains(order, t) {
+			rest = append(rest, t)
+		}
+	}
+	sort.Strings(rest)
+	order = append(order, rest...)
+	if _, ok := byTag[""]; ok {
+		order = append(order, "")
+	}
+
+	groups := make([]helpGroup, 0, len(order))
+	for _, t := range order {
+		title := t
+		if title == "" {
+			title = "Other"
+		}
+		groups = append(groups, helpGroup{title, byTag[t]})
+	}
+	return groups
 }
 
 func commandName(op spec.Operation) string { return kebab(op.ID) }

@@ -24,6 +24,8 @@ const cacheFile = "openapi.json"
 
 type Spec struct {
 	Operations []Operation
+	// Tags are the spec's tag names in their declared order.
+	Tags []string
 }
 
 type Operation struct {
@@ -32,6 +34,8 @@ type Operation struct {
 	Path        string
 	Summary     string
 	Description string
+	// Tag is the operation's first tag, or "" if it has none.
+	Tag string
 	// PathParams are in the order they appear in Path.
 	PathParams  []Param
 	QueryParams []Param
@@ -53,6 +57,7 @@ type rawParam struct {
 
 type rawOperation struct {
 	OperationID string     `json:"operationId"`
+	Tags        []string   `json:"tags"`
 	Summary     string     `json:"summary"`
 	Description string     `json:"description"`
 	Parameters  []rawParam `json:"parameters"`
@@ -61,7 +66,10 @@ type rawOperation struct {
 type rawSpec struct {
 	MinCLIVersion string `json:"x-min-cli-version"`
 	Paths         map[string]map[string]json.RawMessage
-	Components    struct {
+	Tags          []struct {
+		Name string `json:"name"`
+	} `json:"tags"`
+	Components struct {
 		Parameters map[string]rawParam `json:"parameters"`
 	} `json:"components"`
 }
@@ -81,6 +89,9 @@ func Parse(data []byte, cliVersion string) (*Spec, error) {
 	}
 
 	s := &Spec{}
+	for _, t := range raw.Tags {
+		s.Tags = append(s.Tags, t.Name)
+	}
 	seen := map[string]bool{}
 	for path, item := range raw.Paths {
 		var shared []rawParam
@@ -114,6 +125,9 @@ func Parse(data []byte, cliVersion string) (*Spec, error) {
 
 func buildOperation(op rawOperation, method, path string, shared []rawParam, raw rawSpec) Operation {
 	o := Operation{ID: op.OperationID, Method: method, Path: path, Summary: op.Summary, Description: op.Description}
+	if len(op.Tags) > 0 {
+		o.Tag = op.Tags[0]
+	}
 
 	byKey := map[string]rawParam{}
 	var keys []string

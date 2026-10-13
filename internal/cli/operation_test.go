@@ -2,6 +2,8 @@ package cli
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -95,5 +97,45 @@ func TestOperationHelp(t *testing.T) {
 func TestKebab(t *testing.T) {
 	if got := kebab("getProcessMetricSeriesPerInstance"); got != "get-process-metric-series-per-instance" {
 		t.Errorf("kebab = %q", got)
+	}
+}
+
+func TestHelpGroupsCommandsByTag(t *testing.T) {
+	help := run(t, nil, nil, "").stdout
+	order := []string{"General:", "Team:", "Apps:", "Processes:", "Process Metrics:", "list-process-metrics"}
+	last := -1
+	for _, want := range order {
+		i := strings.Index(help, want)
+		if i < 0 || i < last {
+			t.Fatalf("%q out of order or missing in:\n%s", want, help)
+		}
+		last = i
+	}
+	apps, procs := strings.Index(help, "Apps:"), strings.Index(help, "Processes:")
+	if i := strings.Index(help, "list-apps"); i < apps || i > procs {
+		t.Error("list-apps is not under Apps")
+	}
+}
+
+func TestHelpGroupOrder(t *testing.T) {
+	const cached = `{"tags":[{"name":"B"},{"name":"A"}],"paths":{
+		"/1":{"get":{"operationId":"getA","summary":"a","tags":["A"]}},
+		"/2":{"get":{"operationId":"getB","summary":"b","tags":["B"]}},
+		"/3":{"get":{"operationId":"getZ","summary":"z","tags":["Z"]}},
+		"/4":{"get":{"operationId":"getY","summary":"y","tags":["Y"]}},
+		"/5":{"get":{"operationId":"getNone","summary":"n"}}}}`
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "judoscale"), 0o755)
+	os.WriteFile(filepath.Join(dir, "judoscale", "openapi.json"), []byte(cached), 0o644)
+
+	help := runIn(t, dir, nil, nil, "").stdout
+	last := -1
+	// Declared tags in spec order, undeclared alphabetically, untagged last.
+	for _, want := range []string{"B:", "A:", "Y:", "Z:", "Other:"} {
+		i := strings.Index(help, "\n"+want)
+		if i < 0 || i < last {
+			t.Fatalf("%q out of order or missing in:\n%s", want, help)
+		}
+		last = i
 	}
 }
