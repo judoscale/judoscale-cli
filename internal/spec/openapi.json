@@ -1,0 +1,4501 @@
+{
+  "openapi": "3.2.0",
+  "info": {
+    "title": "Judoscale Team API",
+    "version": "1.0.0",
+    "description": "The Judoscale Team API gives you programmatic access to your team, apps, and processes: manage\nautoscaling settings, review metrics and scaling history, and administer your team.\n\n## Authentication\n\nAuthenticate every request with an API token, sent as a bearer token in the `Authorization`\nheader:\n\n```\nAuthorization: Bearer jdo_...\n```\n\nCreate and manage tokens in your Judoscale team account settings. A missing or invalid token\nreturns `401 authentication_error`.\n\nEach token is scoped to a single team and has a **role** and an **access level**:\n\n- **Role**: `member` or `admin`. Admin-only actions reject `member` tokens with `403 permission_error`.\n- **Access**: read-only or read & write. A read-only token may only make `GET`/`HEAD` requests; any other method returns `403 permission_error`.\n\n## Errors\n\nThe API returns conventional HTTP status codes and a consistent JSON error envelope:\n\n```json\n{\n  \"error\": {\n    \"type\": \"invalid_request_error\",\n    \"message\": \"...\",\n    \"param\": \"id\"\n  }\n}\n```\n\n`type` is a stable, machine-readable category; `message` is human-readable. `param` names the\noffending field on validation errors.\n\n| Status | `type` | When |\n| ------ | ------ | ---- |\n| 401 | `authentication_error` | Missing or invalid API token. |\n| 403 | `permission_error` | A read-only token on a write request, or a non-admin token on an admin-only action. |\n| 404 | `not_found` | The requested resource does not exist. |\n| 422 | `invalid_request_error` | The request was malformed or failed validation. |\n| 429 | `rate_limit_error` | Too many requests; the rate limit was exceeded. |\n| 500 | `api_error` | An unexpected error on our end. |\n\n## Pagination\n\nSome list endpoints are paginated, returning up to `100` items per page. A response with more\nitems available includes a `next_cursor`; pass it as the `cursor` query param to fetch the\nnext page. Its absence means you've reached the last page.\n\nRepeat any other filters on every request; a cursor only encodes your position in the list,\nnot the filters that produced it.\n\n## Rate limits\n\nEach API token is limited to 60 requests per minute, plus an additional per-IP limit as a\nbackstop against abuse. Exceeding a limit returns `429 rate_limit_error`; respect the\n`Retry-After` header (seconds to wait) before retrying.\n\n## Browser clients\n\nThe API allows cross-origin requests from any origin. A browser request that sends\n`Authorization` or `Content-Type: application/json` starts with an `OPTIONS` preflight. That\npreflight needs no token and does not count toward the rate limit. Send the bearer token on\nthe request that follows.\n\nResponses include `Access-Control-Allow-Origin: *` and expose `Retry-After` to browser scripts.\nDo not send cookies. The API reads only the bearer token, and it does not allow credentialed\nCORS requests.\n"
+  },
+  "servers": [
+    {
+      "url": "https://api.judoscale.com"
+    }
+  ],
+  "paths": {
+    "/v1/api_tokens": {
+      "get": {
+        "operationId": "listApiTokens",
+        "summary": "List API tokens",
+        "description": "The team's API tokens, sorted by label. The plain token is only returned when it is created.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "api_tokens": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ApiToken"
+                      }
+                    }
+                  },
+                  "required": [
+                    "api_tokens"
+                  ]
+                },
+                "examples": {
+                  "returns_the_team's_tokens,_sorted_by_label": {
+                    "summary": "returns the team's tokens, sorted by label",
+                    "value": {
+                      "api_tokens": [
+                        {
+                          "id": 12345,
+                          "label": "CI integration",
+                          "role": "admin",
+                          "read_only": false,
+                          "last_used_on": "2026-01-01",
+                          "created_at": "2026-01-01T00:00:00Z"
+                        },
+                        {
+                          "id": 12345,
+                          "label": "Deploy bot",
+                          "role": "admin",
+                          "read_only": true,
+                          "last_used_on": "2026-01-01",
+                          "created_at": "2026-01-01T00:00:00Z"
+                        },
+                        {
+                          "id": 12345,
+                          "label": "Member integration",
+                          "role": "member",
+                          "read_only": false,
+                          "last_used_on": null,
+                          "created_at": "2026-01-01T00:00:00Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "description": "The team's API tokens, sorted by label."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "tags": [
+          "API Tokens"
+        ],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createApiToken",
+        "summary": "Create an API token",
+        "description": "Creates an API token, returning the plain token for use with the API. It cannot be fetched again afterwards.",
+        "tags": [
+          "API Tokens"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "description": "Names the token so you can tell your tokens apart. Must be unique within the team.",
+                    "type": "string"
+                  },
+                  "role": {
+                    "default": "member",
+                    "description": "An admin token can manage the team and who belongs to it. Defaults to `member`.",
+                    "type": "string",
+                    "enum": [
+                      "member",
+                      "admin"
+                    ]
+                  },
+                  "read_only": {
+                    "default": false,
+                    "description": "A read-only token may only make GET requests. Defaults to `false`.",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "label"
+                ]
+              },
+              "example": {
+                "label": "Deploy bot",
+                "role": "admin",
+                "read_only": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new API token, including its plain value to authenticate with the API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiToken"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "token"
+                      ],
+                      "properties": {
+                        "token": {
+                          "description": "The plain token, only returned when it is created.",
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "creates_the_token_and_returns_it_once": {
+                    "summary": "creates the token and returns it once",
+                    "value": {
+                      "id": 12345,
+                      "label": "Deploy bot",
+                      "role": "admin",
+                      "read_only": true,
+                      "last_used_on": null,
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "token": "jdo_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/api_tokens/{id}": {
+      "delete": {
+        "operationId": "deleteApiToken",
+        "summary": "Delete an API token",
+        "description": "Revokes an API token. The token stops working immediately and no longer appears in the list.",
+        "tags": [
+          "API Tokens"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The token was revoked."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "get": {
+        "operationId": "getApiToken",
+        "summary": "Retrieve an API token",
+        "description": "A single API token. The plain token is only returned when it is created.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiToken"
+                },
+                "examples": {
+                  "returns_the_token": {
+                    "summary": "returns the token",
+                    "value": {
+                      "id": 12345,
+                      "label": "Member integration",
+                      "role": "member",
+                      "read_only": false,
+                      "last_used_on": null,
+                      "created_at": "2026-01-01T00:00:00Z"
+                    }
+                  }
+                }
+              }
+            },
+            "description": "The API token."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "tags": [
+          "API Tokens"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "updateApiToken",
+        "summary": "Update an API token",
+        "description": "Updates an API token. Role and read-only access cannot be changed once it's created.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiToken"
+                },
+                "examples": {
+                  "renames_the_token": {
+                    "summary": "renames the token",
+                    "value": {
+                      "id": 12345,
+                      "label": "Renamed",
+                      "role": "member",
+                      "read_only": false,
+                      "last_used_on": null,
+                      "created_at": "2026-01-01T00:00:00Z"
+                    }
+                  }
+                }
+              }
+            },
+            "description": "The updated API token."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "tags": [
+          "API Tokens"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "description": "Names the token so you can tell your tokens apart. Must be unique within the team.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "label"
+                ]
+              },
+              "example": {
+                "label": "Renamed"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/apps": {
+      "get": {
+        "operationId": "listApps",
+        "summary": "List apps",
+        "description": "The team's apps currently linked to Judoscale, with each app's subscription and plan limits (if applicable).",
+        "tags": [
+          "Apps"
+        ],
+        "responses": {
+          "200": {
+            "description": "The team's apps linked to Judoscale.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "apps": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/App"
+                      }
+                    }
+                  },
+                  "required": [
+                    "apps"
+                  ]
+                },
+                "examples": {
+                  "returns_the_team's_active_apps": {
+                    "summary": "returns the team's active apps",
+                    "value": {
+                      "apps": [
+                        {
+                          "id": 12345,
+                          "name": "My App",
+                          "maintenance_enabled_at": null,
+                          "webhook_url": null,
+                          "created_at": "2026-01-01T00:00:00Z",
+                          "subscription": {
+                            "plan": "Free",
+                            "legacy": true,
+                            "status": "active",
+                            "limits": {
+                              "max_scale": null,
+                              "max_perf_scale": null
+                            },
+                            "autoscale_events": {
+                              "limit": 20,
+                              "remaining": 20
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/apps/{app_id}/maintenance": {
+      "delete": {
+        "operationId": "disableAppMaintenance",
+        "summary": "Disable maintenance mode",
+        "description": "Resumes autoscaling and restores workers to their previous scale.",
+        "tags": [
+          "App Maintenance"
+        ],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Maintenance mode disabled for the app.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "maintenance_enabled_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "warning": {
+                      "description": "Present only when Judoscale's own state was updated but the platform failed to apply the resulting scale change to your instances. Review the scale on your platform directly.",
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "description": "A stable, machine-readable category. Currently always `scaling_failed`.",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "Human-readable explanation of what went wrong.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "maintenance_enabled_at"
+                  ]
+                },
+                "examples": {
+                  "disables_maintenance_mode_for_the_app": {
+                    "summary": "disables maintenance mode for the app",
+                    "value": {
+                      "id": 12345,
+                      "maintenance_enabled_at": null
+                    }
+                  },
+                  "disables_maintenance_mode_and_warns_when_the_platform_scaling_fails": {
+                    "summary": "disables maintenance mode and warns when the platform scaling fails",
+                    "value": {
+                      "id": 12345,
+                      "maintenance_enabled_at": null,
+                      "warning": {
+                        "type": "scaling_failed",
+                        "message": "Maintenance was updated, but Heroku returned an error while scaling your dynos. Please review them to ensure they are scaled correctly."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "enableAppMaintenance",
+        "summary": "Enable maintenance mode",
+        "description": "Pauses autoscaling and scales workers to 0.",
+        "tags": [
+          "App Maintenance"
+        ],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Maintenance mode enabled for the app.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "maintenance_enabled_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "warning": {
+                      "description": "Present only when Judoscale's own state was updated but the platform failed to apply the resulting scale change to your instances. Review the scale on your platform directly.",
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "description": "A stable, machine-readable category. Currently always `scaling_failed`.",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "Human-readable explanation of what went wrong.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "maintenance_enabled_at"
+                  ]
+                },
+                "examples": {
+                  "enables_maintenance_mode_for_the_app": {
+                    "summary": "enables maintenance mode for the app",
+                    "value": {
+                      "id": 12345,
+                      "maintenance_enabled_at": "2026-01-01T00:00:00Z"
+                    }
+                  },
+                  "enables_maintenance_mode_and_warns_when_the_platform_scaling_fails": {
+                    "summary": "enables maintenance mode and warns when the platform scaling fails",
+                    "value": {
+                      "id": 12345,
+                      "maintenance_enabled_at": "2026-01-01T00:00:00Z",
+                      "warning": {
+                        "type": "scaling_failed",
+                        "message": "Maintenance was updated, but Heroku returned an error while scaling your dynos. Please review them to ensure they are scaled correctly."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/apps/{app_id}/processes": {
+      "get": {
+        "operationId": "listAppProcesses",
+        "summary": "List an app's processes",
+        "description": "The app's currently linked processes and autoscaling settings, autoscaling-enabled and web processes first, then alphabetically.",
+        "tags": [
+          "Processes"
+        ],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The app's currently linked processes and autoscale settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "processes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Process"
+                      }
+                    }
+                  },
+                  "required": [
+                    "processes"
+                  ]
+                },
+                "examples": {
+                  "returns_the_app's_linked_processes,_sorted": {
+                    "summary": "returns the app's linked processes, sorted",
+                    "value": {
+                      "processes": [
+                        {
+                          "id": 12345,
+                          "app_id": 12345,
+                          "name": "web",
+                          "type": "web",
+                          "autoscaling_enabled": true,
+                          "current_scale": 1,
+                          "min_scale": 1,
+                          "max_scale": 5,
+                          "upscale_quantity": 1,
+                          "upscale_interval_seconds": 120,
+                          "upscale_sensitivity_seconds": 10,
+                          "downscale_quantity": 1,
+                          "downscale_interval_seconds": 900,
+                          "schedule_time_zone": "Etc/UTC",
+                          "autoscale_metrics": [
+                            {
+                              "metric": "queue_time",
+                              "upscale_threshold": 75,
+                              "downscale_threshold": 50
+                            }
+                          ],
+                          "created_at": "2026-01-01T00:00:00Z",
+                          "sniping_enabled": false
+                        },
+                        {
+                          "id": 12345,
+                          "app_id": 12345,
+                          "name": "worker",
+                          "type": "worker",
+                          "autoscaling_enabled": true,
+                          "current_scale": 1,
+                          "min_scale": 3,
+                          "max_scale": 5,
+                          "upscale_quantity": 1,
+                          "upscale_interval_seconds": 120,
+                          "upscale_sensitivity_seconds": 10,
+                          "downscale_quantity": 1,
+                          "downscale_interval_seconds": 900,
+                          "schedule_time_zone": "Etc/UTC",
+                          "autoscale_metrics": [
+                            {
+                              "metric": "queue_time",
+                              "upscale_threshold": 75,
+                              "downscale_threshold": 50
+                            }
+                          ],
+                          "created_at": "2026-01-01T00:00:00Z",
+                          "protect_long_jobs": false,
+                          "all_queues": false,
+                          "queue_names": [
+                            "within_five_seconds"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/apps/{id}": {
+      "delete": {
+        "operationId": "deleteApp",
+        "summary": "Delete an app",
+        "description": "Unlinks the app from Judoscale. All autoscaling must be turned off first.",
+        "tags": [
+          "Apps"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The app was unlinked."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "get": {
+        "operationId": "getApp",
+        "summary": "Retrieve an app",
+        "description": "The app, and its subscription with plan limits (if applicable).",
+        "tags": [
+          "Apps"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The app, and its subscription with plan limits (if applicable).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/App"
+                },
+                "examples": {
+                  "returns_the_app,_its_add-on_subscription,_and_the_limits_of_the_plan": {
+                    "summary": "returns the app, its add-on subscription, and the limits of the plan",
+                    "value": {
+                      "id": 12345,
+                      "name": "My App",
+                      "maintenance_enabled_at": null,
+                      "webhook_url": null,
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "subscription": {
+                        "plan": "Orange Belt",
+                        "legacy": false,
+                        "status": "active",
+                        "limits": {
+                          "max_scale": 10,
+                          "max_perf_scale": 3
+                        },
+                        "autoscale_events": {
+                          "limit": null,
+                          "remaining": null
+                        }
+                      }
+                    }
+                  },
+                  "omits_the_subscription_of_an_app_billed_through_its_team": {
+                    "summary": "omits the subscription of an app billed through its team",
+                    "value": {
+                      "id": 12345,
+                      "name": "My App",
+                      "maintenance_enabled_at": null,
+                      "webhook_url": null,
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "subscription": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "updateApp",
+        "summary": "Update an app",
+        "description": "Updates an app.",
+        "tags": [
+          "Apps"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "webhook_url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "webhook_url"
+                ]
+              },
+              "example": {
+                "webhook_url": "https://hooks.slack.com/services/abc"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated app.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/App"
+                },
+                "examples": {
+                  "updates_the_app": {
+                    "summary": "updates the app",
+                    "value": {
+                      "id": 12345,
+                      "name": "My App",
+                      "maintenance_enabled_at": null,
+                      "webhook_url": "https://hooks.slack.com/services/abc",
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "subscription": {
+                        "plan": "Free",
+                        "legacy": true,
+                        "status": "active",
+                        "limits": {
+                          "max_scale": null,
+                          "max_perf_scale": null
+                        },
+                        "autoscale_events": {
+                          "limit": 20,
+                          "remaining": 20
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/memberships": {
+      "get": {
+        "operationId": "listMemberships",
+        "summary": "List memberships",
+        "description": "The team's members, sorted by email.",
+        "tags": [
+          "Memberships"
+        ],
+        "responses": {
+          "200": {
+            "description": "The team's members, sorted by email.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "memberships": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Membership"
+                      }
+                    }
+                  },
+                  "required": [
+                    "memberships"
+                  ]
+                },
+                "examples": {
+                  "returns_the_team's_members": {
+                    "summary": "returns the team's members",
+                    "value": {
+                      "memberships": [
+                        {
+                          "id": 12345,
+                          "email": "ada@example.com",
+                          "role": "member",
+                          "invitation_pending": false,
+                          "otp_status": "disabled",
+                          "synced": true,
+                          "created_at": "2026-01-01T00:00:00Z"
+                        },
+                        {
+                          "id": 12345,
+                          "email": "grace@example.com",
+                          "role": "admin",
+                          "invitation_pending": false,
+                          "otp_status": "sso_only",
+                          "synced": false,
+                          "created_at": "2026-01-01T00:00:00Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createMembership",
+        "summary": "Create a membership",
+        "description": "Adds a member to the team, inviting them by email if they don't have a Judoscale account yet.",
+        "tags": [
+          "Memberships"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "description": "Their email address. They are invited if they don't have an account yet.",
+                    "type": "string"
+                  },
+                  "role": {
+                    "default": "member",
+                    "description": "Admins can manage the team and who belongs to it. Defaults to `member`.",
+                    "type": "string",
+                    "enum": [
+                      "member",
+                      "admin"
+                    ]
+                  }
+                },
+                "required": [
+                  "email"
+                ]
+              },
+              "example": {
+                "email": "ada@example.com",
+                "role": "admin"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new membership.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Membership"
+                },
+                "examples": {
+                  "invites_someone_and_returns_the_membership": {
+                    "summary": "invites someone and returns the membership",
+                    "value": {
+                      "id": 12345,
+                      "email": "ada@example.com",
+                      "role": "admin",
+                      "invitation_pending": true,
+                      "otp_status": "disabled",
+                      "synced": false,
+                      "created_at": "2026-01-01T00:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/memberships/{id}": {
+      "delete": {
+        "operationId": "deleteMembership",
+        "summary": "Delete a membership",
+        "description": "Removes a member from the team.",
+        "tags": [
+          "Memberships"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The member was removed."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "get": {
+        "operationId": "getMembership",
+        "summary": "Retrieve a membership",
+        "description": "A single team member.",
+        "tags": [
+          "Memberships"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The membership.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Membership"
+                },
+                "examples": {
+                  "returns_the_member": {
+                    "summary": "returns the member",
+                    "value": {
+                      "id": 12345,
+                      "email": "ada@example.com",
+                      "role": "member",
+                      "invitation_pending": false,
+                      "otp_status": "disabled",
+                      "synced": false,
+                      "created_at": "2026-01-01T00:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "updateMembership",
+        "summary": "Update a membership",
+        "description": "Updates a membership. Email cannot be changed.",
+        "tags": [
+          "Memberships"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "description": "Admins can manage the team and who belongs to it.",
+                    "type": "string",
+                    "enum": [
+                      "member",
+                      "admin"
+                    ]
+                  }
+                },
+                "required": [
+                  "role"
+                ]
+              },
+              "example": {
+                "role": "admin"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated membership.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Membership"
+                },
+                "examples": {
+                  "changes_the_role": {
+                    "summary": "changes the role",
+                    "value": {
+                      "id": 12345,
+                      "email": "ada@example.com",
+                      "role": "admin",
+                      "invitation_pending": false,
+                      "otp_status": "disabled",
+                      "synced": false,
+                      "created_at": "2026-01-01T00:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/processes/{id}": {
+      "get": {
+        "operationId": "getProcess",
+        "summary": "Retrieve a process",
+        "description": "The linked process, with its enabled autoscale metrics and settings.",
+        "tags": [
+          "Processes"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The process.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Process"
+                },
+                "examples": {
+                  "returns_the_process_with_its_enabled_autoscale_metrics": {
+                    "summary": "returns the process with its enabled autoscale metrics",
+                    "value": {
+                      "id": 12345,
+                      "app_id": 12345,
+                      "name": "web",
+                      "type": "web",
+                      "autoscaling_enabled": true,
+                      "current_scale": 1,
+                      "min_scale": 1,
+                      "max_scale": 5,
+                      "upscale_quantity": 1,
+                      "upscale_interval_seconds": 120,
+                      "upscale_sensitivity_seconds": 10,
+                      "downscale_quantity": 1,
+                      "downscale_interval_seconds": 900,
+                      "schedule_time_zone": "Etc/UTC",
+                      "autoscale_metrics": [
+                        {
+                          "metric": "queue_time",
+                          "upscale_threshold": 75,
+                          "downscale_threshold": 50
+                        }
+                      ],
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "sniping_enabled": false
+                    }
+                  },
+                  "includes_worker-only_fields_for_worker_processes": {
+                    "summary": "includes worker-only fields for worker processes",
+                    "value": {
+                      "id": 12345,
+                      "app_id": 12345,
+                      "name": "worker",
+                      "type": "worker",
+                      "autoscaling_enabled": true,
+                      "current_scale": 1,
+                      "min_scale": 3,
+                      "max_scale": 5,
+                      "upscale_quantity": 1,
+                      "upscale_interval_seconds": 120,
+                      "upscale_sensitivity_seconds": 10,
+                      "downscale_quantity": 1,
+                      "downscale_interval_seconds": 900,
+                      "schedule_time_zone": "Etc/UTC",
+                      "autoscale_metrics": [
+                        {
+                          "metric": "queue_time",
+                          "upscale_threshold": 75,
+                          "downscale_threshold": 50
+                        }
+                      ],
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "protect_long_jobs": false,
+                      "all_queues": false,
+                      "queue_names": [
+                        "within_five_seconds"
+                      ]
+                    }
+                  },
+                  "includes_dynamic_upscale_jumps_for_a_web_process_when_the_feature_is_enabled": {
+                    "summary": "includes dynamic upscale jumps for a web process when the feature is enabled",
+                    "value": {
+                      "id": 12345,
+                      "app_id": 12345,
+                      "name": "web",
+                      "type": "web",
+                      "autoscaling_enabled": true,
+                      "current_scale": 1,
+                      "min_scale": 1,
+                      "max_scale": 5,
+                      "upscale_quantity": 1,
+                      "upscale_interval_seconds": 120,
+                      "upscale_sensitivity_seconds": 10,
+                      "downscale_quantity": 1,
+                      "downscale_interval_seconds": 900,
+                      "schedule_time_zone": "Etc/UTC",
+                      "autoscale_metrics": [
+                        {
+                          "metric": "queue_time",
+                          "upscale_threshold": 75,
+                          "downscale_threshold": 50
+                        }
+                      ],
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "dynamic_upscale_jumps": true,
+                      "sniping_enabled": false
+                    }
+                  },
+                  "omits_dynamic_upscale_jumps_for_a_worker_even_when_the_feature_is_enabled": {
+                    "summary": "omits dynamic upscale jumps for a worker even when the feature is enabled",
+                    "value": {
+                      "id": 12345,
+                      "app_id": 12345,
+                      "name": "worker",
+                      "type": "worker",
+                      "autoscaling_enabled": true,
+                      "current_scale": 1,
+                      "min_scale": 3,
+                      "max_scale": 5,
+                      "upscale_quantity": 1,
+                      "upscale_interval_seconds": 120,
+                      "upscale_sensitivity_seconds": 10,
+                      "downscale_quantity": 1,
+                      "downscale_interval_seconds": 900,
+                      "schedule_time_zone": "Etc/UTC",
+                      "autoscale_metrics": [
+                        {
+                          "metric": "queue_time",
+                          "upscale_threshold": 75,
+                          "downscale_threshold": 50
+                        }
+                      ],
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "protect_long_jobs": false,
+                      "all_queues": false,
+                      "queue_names": [
+                        "within_five_seconds"
+                      ]
+                    }
+                  },
+                  "omits_thresholds_for_the_scaling_schedule_metric": {
+                    "summary": "omits thresholds for the scaling schedule metric",
+                    "value": {
+                      "id": 12345,
+                      "app_id": 12345,
+                      "name": "web",
+                      "type": "web",
+                      "autoscaling_enabled": true,
+                      "current_scale": 1,
+                      "min_scale": 1,
+                      "max_scale": 5,
+                      "upscale_quantity": 1,
+                      "upscale_interval_seconds": 120,
+                      "upscale_sensitivity_seconds": 10,
+                      "downscale_quantity": 1,
+                      "downscale_interval_seconds": 900,
+                      "schedule_time_zone": "Etc/UTC",
+                      "autoscale_metrics": [
+                        {
+                          "metric": "queue_time",
+                          "upscale_threshold": 75,
+                          "downscale_threshold": 50
+                        },
+                        {
+                          "metric": "scaling_schedule"
+                        }
+                      ],
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "sniping_enabled": false
+                    }
+                  },
+                  "includes_dynamic_upscale_jumps_once_the_process_reports_utilization": {
+                    "summary": "includes dynamic upscale jumps once the process reports utilization",
+                    "value": {
+                      "id": 12345,
+                      "app_id": 12345,
+                      "name": "web",
+                      "type": "web",
+                      "autoscaling_enabled": true,
+                      "current_scale": 1,
+                      "min_scale": 1,
+                      "max_scale": 5,
+                      "upscale_quantity": 1,
+                      "upscale_interval_seconds": 120,
+                      "upscale_sensitivity_seconds": 10,
+                      "downscale_quantity": 1,
+                      "downscale_interval_seconds": 900,
+                      "schedule_time_zone": "Etc/UTC",
+                      "autoscale_metrics": [
+                        {
+                          "metric": "queue_time",
+                          "upscale_threshold": 75,
+                          "downscale_threshold": 50
+                        }
+                      ],
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "dynamic_upscale_jumps": false,
+                      "sniping_enabled": false
+                    }
+                  },
+                  "omits_dynamic_upscale_jumps_until_the_process_reports_utilization": {
+                    "summary": "omits dynamic upscale jumps until the process reports utilization",
+                    "value": {
+                      "id": 12345,
+                      "app_id": 12345,
+                      "name": "web",
+                      "type": "web",
+                      "autoscaling_enabled": true,
+                      "current_scale": 1,
+                      "min_scale": 1,
+                      "max_scale": 5,
+                      "upscale_quantity": 1,
+                      "upscale_interval_seconds": 120,
+                      "upscale_sensitivity_seconds": 10,
+                      "downscale_quantity": 1,
+                      "downscale_interval_seconds": 900,
+                      "schedule_time_zone": "Etc/UTC",
+                      "autoscale_metrics": [
+                        {
+                          "metric": "queue_time",
+                          "upscale_threshold": 75,
+                          "downscale_threshold": 50
+                        }
+                      ],
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "sniping_enabled": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "updateProcess",
+        "summary": "Update a process",
+        "description": "Updates a process's autoscaling settings.",
+        "tags": [
+          "Processes"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "autoscaling_enabled": {
+                    "description": "Whether autoscaling is currently enabled on this process.",
+                    "type": "boolean"
+                  },
+                  "min_scale": {
+                    "description": "The floor of the autoscaling range, in instances. `0` may be set for a worker, or a process autoscaling on `scaling_schedule`.",
+                    "type": "integer"
+                  },
+                  "max_scale": {
+                    "description": "The ceiling of the autoscaling range, in instances.",
+                    "type": "integer"
+                  },
+                  "upscale_quantity": {
+                    "description": "How many instances to add on an upscale.",
+                    "type": "integer"
+                  },
+                  "dynamic_upscale_jumps": {
+                    "description": "When enabled, a throughput spike chooses the upscale jump. The smallest jump is 1. `upscale_quantity` applies only while this is off. Web processes only, and included only when the team has the dynamic-upscale-jumps feature enabled and the process is reporting recent utilization.",
+                    "type": "boolean"
+                  },
+                  "upscale_interval_seconds": {
+                    "description": "Minimum time between upscales, in seconds.",
+                    "type": "integer"
+                  },
+                  "upscale_sensitivity_seconds": {
+                    "description": "How long a metric must stay above its threshold before triggering an upscale, in seconds. Must be one of 10, 20, 30.",
+                    "type": "integer"
+                  },
+                  "downscale_quantity": {
+                    "description": "How many instances to remove on a downscale.",
+                    "type": "integer"
+                  },
+                  "downscale_interval_seconds": {
+                    "description": "Minimum time between downscales, in seconds.",
+                    "type": "integer"
+                  },
+                  "sniping_enabled": {
+                    "description": "Automatically restarts instances whose metrics stay well above the rest of the fleet. Web processes only, and only on platforms that support it.",
+                    "type": "boolean"
+                  },
+                  "autoscale_metrics": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/AutoscaleMetric"
+                    }
+                  },
+                  "protect_long_jobs": {
+                    "description": "Wait for in-flight jobs to finish before scaling this worker down. Worker processes only, requires `queue_busy` metric.",
+                    "type": "boolean"
+                  },
+                  "all_queues": {
+                    "description": "Autoscale on all queues instead of just the ones in `queue_names`. Worker processes only.",
+                    "type": "boolean"
+                  },
+                  "queue_names": {
+                    "description": "The specific queues to autoscale on, used when `all_queues` is false. Worker processes only.",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "schedule_time_zone": {
+                    "description": "The time zone schedule entries are interpreted in. Changing it shifts existing entries' time and wday by the time difference, so they keep firing at the same moment.",
+                    "type": "string"
+                  }
+                }
+              },
+              "examples": {
+                "updates_autoscaling_settings": {
+                  "summary": "updates autoscaling settings",
+                  "value": {
+                    "autoscaling_enabled": true,
+                    "min_scale": 1,
+                    "max_scale": 8,
+                    "upscale_quantity": 2,
+                    "upscale_interval_seconds": 120,
+                    "upscale_sensitivity_seconds": 10,
+                    "downscale_quantity": 1,
+                    "downscale_interval_seconds": 900,
+                    "sniping_enabled": false,
+                    "autoscale_metrics": [
+                      {
+                        "metric": "queue_time",
+                        "upscale_threshold": 80,
+                        "downscale_threshold": 40
+                      }
+                    ],
+                    "schedule_time_zone": "America/New_York"
+                  }
+                },
+                "updates_dynamic_upscale_jumps_when_the_feature_is_enabled": {
+                  "summary": "updates dynamic upscale jumps when the feature is enabled",
+                  "value": {
+                    "dynamic_upscale_jumps": true
+                  }
+                },
+                "updates_worker-only_settings": {
+                  "summary": "updates worker-only settings",
+                  "value": {
+                    "protect_long_jobs": true,
+                    "all_queues": true,
+                    "queue_names": [
+                      "default"
+                    ]
+                  }
+                },
+                "updates_autoscale_metric_thresholds_by_metric": {
+                  "summary": "updates autoscale metric thresholds by metric",
+                  "value": {
+                    "autoscale_metrics": [
+                      {
+                        "metric": "queue_time",
+                        "downscale_threshold": 40
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated process.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Process"
+                },
+                "examples": {
+                  "updates_autoscaling_settings": {
+                    "summary": "updates autoscaling settings",
+                    "value": {
+                      "id": 12345,
+                      "app_id": 12345,
+                      "name": "web",
+                      "type": "web",
+                      "autoscaling_enabled": true,
+                      "current_scale": 1,
+                      "min_scale": 1,
+                      "max_scale": 8,
+                      "upscale_quantity": 2,
+                      "upscale_interval_seconds": 120,
+                      "upscale_sensitivity_seconds": 10,
+                      "downscale_quantity": 1,
+                      "downscale_interval_seconds": 900,
+                      "schedule_time_zone": "America/New_York",
+                      "autoscale_metrics": [
+                        {
+                          "metric": "queue_time",
+                          "upscale_threshold": 80,
+                          "downscale_threshold": 40
+                        }
+                      ],
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "sniping_enabled": false
+                    }
+                  },
+                  "updates_dynamic_upscale_jumps_when_the_feature_is_enabled": {
+                    "summary": "updates dynamic upscale jumps when the feature is enabled",
+                    "value": {
+                      "id": 12345,
+                      "app_id": 12345,
+                      "name": "web",
+                      "type": "web",
+                      "autoscaling_enabled": true,
+                      "current_scale": 1,
+                      "min_scale": 1,
+                      "max_scale": 5,
+                      "upscale_quantity": 1,
+                      "upscale_interval_seconds": 120,
+                      "upscale_sensitivity_seconds": 10,
+                      "downscale_quantity": 1,
+                      "downscale_interval_seconds": 900,
+                      "schedule_time_zone": "Etc/UTC",
+                      "autoscale_metrics": [
+                        {
+                          "metric": "queue_time",
+                          "upscale_threshold": 75,
+                          "downscale_threshold": 50
+                        }
+                      ],
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "dynamic_upscale_jumps": true,
+                      "sniping_enabled": false
+                    }
+                  },
+                  "updates_worker-only_settings": {
+                    "summary": "updates worker-only settings",
+                    "value": {
+                      "id": 12345,
+                      "app_id": 12345,
+                      "name": "worker",
+                      "type": "worker",
+                      "autoscaling_enabled": true,
+                      "current_scale": 1,
+                      "min_scale": 3,
+                      "max_scale": 5,
+                      "upscale_quantity": 1,
+                      "upscale_interval_seconds": 120,
+                      "upscale_sensitivity_seconds": 10,
+                      "downscale_quantity": 1,
+                      "downscale_interval_seconds": 900,
+                      "schedule_time_zone": "Etc/UTC",
+                      "autoscale_metrics": [
+                        {
+                          "metric": "queue_time",
+                          "upscale_threshold": 75,
+                          "downscale_threshold": 50
+                        }
+                      ],
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "protect_long_jobs": true,
+                      "all_queues": true,
+                      "queue_names": [
+                        "default"
+                      ]
+                    }
+                  },
+                  "updates_autoscale_metric_thresholds_by_metric": {
+                    "summary": "updates autoscale metric thresholds by metric",
+                    "value": {
+                      "id": 12345,
+                      "app_id": 12345,
+                      "name": "web",
+                      "type": "web",
+                      "autoscaling_enabled": true,
+                      "current_scale": 1,
+                      "min_scale": 1,
+                      "max_scale": 5,
+                      "upscale_quantity": 1,
+                      "upscale_interval_seconds": 120,
+                      "upscale_sensitivity_seconds": 10,
+                      "downscale_quantity": 1,
+                      "downscale_interval_seconds": 900,
+                      "schedule_time_zone": "Etc/UTC",
+                      "autoscale_metrics": [
+                        {
+                          "metric": "queue_time",
+                          "upscale_threshold": 80,
+                          "downscale_threshold": 40
+                        }
+                      ],
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "sniping_enabled": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/processes/{process_id}/autoscale_metrics": {
+      "get": {
+        "operationId": "getProcessAutoscaleMetrics",
+        "summary": "Retrieve a process's autoscale metrics",
+        "description": "The metrics this process can autoscale on, which of them currently drive its autoscaling, and which have reported in the last few minutes (if applicable). Any metric listed here can be enabled, reporting or not. Only certain metrics can be combined.",
+        "tags": [
+          "Process Autoscale Metrics"
+        ],
+        "parameters": [
+          {
+            "name": "process_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "autoscale_metrics": {
+                      "description": "The metrics available to this process.",
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AutoscaleMetricStatus"
+                      }
+                    }
+                  },
+                  "required": [
+                    "autoscale_metrics"
+                  ]
+                },
+                "examples": {
+                  "returns_the_worker_metrics_for_a_worker_process": {
+                    "summary": "returns the worker metrics for a worker process",
+                    "value": {
+                      "autoscale_metrics": [
+                        {
+                          "metric": "queue_time",
+                          "enabled": true,
+                          "has_recent_metrics": true
+                        },
+                        {
+                          "metric": "queue_depth",
+                          "enabled": false,
+                          "has_recent_metrics": false
+                        },
+                        {
+                          "metric": "scaling_schedule",
+                          "enabled": false,
+                          "has_recent_metrics": null
+                        }
+                      ]
+                    }
+                  },
+                  "returns_each_metric's_state_for_a_web_process": {
+                    "summary": "returns each metric's state for a web process",
+                    "value": {
+                      "autoscale_metrics": [
+                        {
+                          "metric": "queue_time",
+                          "enabled": true,
+                          "has_recent_metrics": true
+                        },
+                        {
+                          "metric": "utilization",
+                          "enabled": false,
+                          "has_recent_metrics": false
+                        },
+                        {
+                          "metric": "response_time",
+                          "enabled": false,
+                          "has_recent_metrics": false
+                        },
+                        {
+                          "metric": "scaling_schedule",
+                          "enabled": false,
+                          "has_recent_metrics": null
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "description": "The metrics available to this process, which of them are enabled, and which have recent metrics."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "updateProcessAutoscaleMetrics",
+        "summary": "Update a process's autoscale metrics",
+        "description": "Sets which metrics drive this process's autoscaling. What you send becomes the enabled set, so\nanything left out is disabled and at least one metric is required. Thresholds are set on the\nprocess itself.\n\nSwitching to `scaling_schedule` seeds a default schedule for a process that has none, which can\nbe managed through its schedule.\n\nSwitching to `response_time`, where available, creates the log drain that ingests response times\nfrom your application logs.",
+        "tags": [
+          "Process Autoscale Metrics"
+        ],
+        "parameters": [
+          {
+            "name": "process_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "metrics": {
+                    "description": "The metrics to autoscale on, replacing whatever is enabled today. Valid values depend on the process type and availability:\n- web: `queue_time`, `utilization`, `response_time`, `scaling_schedule`\n- worker: `queue_time`, `queue_depth`, `scaling_schedule`\n\nIt's possible to autoscale on multiple metrics by combining them, depending on availability:\n- web:\n  - `queue_time` + `utilization`\n- worker:\n  - `queue_depth` + `queue_time`",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "metrics"
+                ]
+              },
+              "examples": {
+                "enables_the_metrics_it_is_given_and_disables_the_ones_left_out": {
+                  "summary": "enables the metrics it is given and disables the ones left out",
+                  "value": {
+                    "metrics": [
+                      "utilization"
+                    ]
+                  }
+                },
+                "enables_both_metrics_of_a_valid_combination": {
+                  "summary": "enables both metrics of a valid combination",
+                  "value": {
+                    "metrics": [
+                      "queue_time",
+                      "utilization"
+                    ]
+                  }
+                },
+                "422s_for_a_metric_this_process_cannot_autoscale_on": {
+                  "summary": "422s for a metric this process cannot autoscale on",
+                  "value": {
+                    "metrics": [
+                      "banana"
+                    ]
+                  }
+                },
+                "404s_for_a_process_on_another_team": {
+                  "summary": "404s for a process on another team",
+                  "value": {
+                    "metrics": [
+                      "queue_time"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "autoscale_metrics": {
+                      "description": "The metrics available to this process.",
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AutoscaleMetricStatus"
+                      }
+                    }
+                  },
+                  "required": [
+                    "autoscale_metrics"
+                  ]
+                },
+                "examples": {
+                  "enables_the_metrics_it_is_given_and_disables_the_ones_left_out": {
+                    "summary": "enables the metrics it is given and disables the ones left out",
+                    "value": {
+                      "autoscale_metrics": [
+                        {
+                          "metric": "queue_time",
+                          "enabled": false,
+                          "has_recent_metrics": false
+                        },
+                        {
+                          "metric": "utilization",
+                          "enabled": true,
+                          "has_recent_metrics": true
+                        },
+                        {
+                          "metric": "response_time",
+                          "enabled": false,
+                          "has_recent_metrics": false
+                        },
+                        {
+                          "metric": "scaling_schedule",
+                          "enabled": false,
+                          "has_recent_metrics": null
+                        }
+                      ]
+                    }
+                  },
+                  "enables_both_metrics_of_a_valid_combination": {
+                    "summary": "enables both metrics of a valid combination",
+                    "value": {
+                      "autoscale_metrics": [
+                        {
+                          "metric": "queue_time",
+                          "enabled": true,
+                          "has_recent_metrics": true
+                        },
+                        {
+                          "metric": "utilization",
+                          "enabled": true,
+                          "has_recent_metrics": true
+                        },
+                        {
+                          "metric": "response_time",
+                          "enabled": false,
+                          "has_recent_metrics": false
+                        },
+                        {
+                          "metric": "scaling_schedule",
+                          "enabled": false,
+                          "has_recent_metrics": null
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "description": "The status of each autoscale metric after the change."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/processes/{process_id}/metrics": {
+      "get": {
+        "operationId": "listProcessMetrics",
+        "summary": "List a process's metrics",
+        "description": "Available metrics based on the process type and platform.",
+        "tags": [
+          "Process Metrics"
+        ],
+        "parameters": [
+          {
+            "name": "process_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "metrics": {
+                      "description": "Every metric available for this process, whether or not it is actively being reported or used for autoscaling.",
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Metric"
+                      }
+                    }
+                  },
+                  "required": [
+                    "metrics"
+                  ]
+                },
+                "examples": {
+                  "returns_every_metric_the_process_reports,_and_what_its_values_are_measured_in": {
+                    "summary": "returns every metric the process reports, and what its values are measured in",
+                    "value": {
+                      "metrics": [
+                        {
+                          "metric": "queue_time",
+                          "unit": "ms"
+                        },
+                        {
+                          "metric": "utilization",
+                          "unit": "percent"
+                        },
+                        {
+                          "metric": "response_time",
+                          "unit": "ms"
+                        },
+                        {
+                          "metric": "rps",
+                          "unit": "requests_per_second"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "description": "Available metrics for this process."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/processes/{process_id}/metrics/{metric}": {
+      "get": {
+        "operationId": "getProcessMetricSeries",
+        "summary": "Retrieve a metric's time series",
+        "description": "The metric's data points over a time window, one per bucket. The window is exclusive: the bucket at `to` opens the next window. Judoscale picks the bucket width from the span of the window. Metrics are kept for 7 days.",
+        "tags": [
+          "Process Metrics"
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "2026-01-01T00:00:00Z",
+            "description": "ISO 8601 timestamp. Records at or after this time."
+          },
+          {
+            "name": "metric",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "queue_time",
+                "utilization",
+                "response_time",
+                "rps",
+                "queue_depth",
+                "queue_busy"
+              ]
+            },
+            "example": "queue_time"
+          },
+          {
+            "name": "process_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "2026-01-01T00:00:00Z",
+            "description": "ISO 8601 timestamp. Records strictly before this time. Must not precede `from`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricSeries"
+                },
+                "examples": {
+                  "returns_one_point_per_bucket_over_the_window": {
+                    "summary": "returns one point per bucket over the window",
+                    "value": {
+                      "metric": "queue_time",
+                      "unit": "ms",
+                      "bucket_width_seconds": 10,
+                      "points": [
+                        {
+                          "time": "2026-01-01T00:00:00Z",
+                          "value": 100.0
+                        },
+                        {
+                          "time": "2026-01-01T00:00:00Z",
+                          "value": 0.0
+                        },
+                        {
+                          "time": "2026-01-01T00:00:00Z",
+                          "value": 0.0
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "description": "The metric's data points over the requested window."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/processes/{process_id}/metrics/{metric}/per_instance": {
+      "get": {
+        "operationId": "getProcessMetricSeriesPerInstance",
+        "summary": "Retrieve a metric's time series per instance",
+        "description": "The metric's data points split by instance. The same window, bucket, and retention rules apply. Only available for `queue_time`, `response_time`.",
+        "tags": [
+          "Process Metrics"
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "2026-01-01T00:00:00Z",
+            "description": "ISO 8601 timestamp. Records at or after this time."
+          },
+          {
+            "name": "metric",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "queue_time",
+                "response_time"
+              ]
+            },
+            "example": "queue_time"
+          },
+          {
+            "name": "process_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "2026-01-01T00:00:00Z",
+            "description": "ISO 8601 timestamp. Records strictly before this time. Must not precede `from`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The metric's data points per instance over the requested window.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricSeriesPerInstance"
+                },
+                "examples": {
+                  "returns_a_series_per_instance_over_the_window": {
+                    "summary": "returns a series per instance over the window",
+                    "value": {
+                      "metric": "queue_time",
+                      "unit": "ms",
+                      "bucket_width_seconds": 10,
+                      "instances": [
+                        {
+                          "instance": "web.1",
+                          "points": [
+                            {
+                              "time": "2026-01-01T00:00:00Z",
+                              "value": 100.0
+                            },
+                            {
+                              "time": "2026-01-01T00:00:00Z",
+                              "value": 0.0
+                            },
+                            {
+                              "time": "2026-01-01T00:00:00Z",
+                              "value": 0.0
+                            }
+                          ]
+                        },
+                        {
+                          "instance": "web.2",
+                          "points": [
+                            {
+                              "time": "2026-01-01T00:00:00Z",
+                              "value": 0.0
+                            },
+                            {
+                              "time": "2026-01-01T00:00:00Z",
+                              "value": 50.0
+                            },
+                            {
+                              "time": "2026-01-01T00:00:00Z",
+                              "value": 0.0
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/processes/{process_id}/restart_events": {
+      "get": {
+        "operationId": "listProcessRestartEvents",
+        "summary": "List a process's restart events",
+        "description": "The process's instance restarts, newest first. Events are kept for 4 months.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "restart_events": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RestartEvent"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": "string",
+                      "description": "Pass as `cursor` to fetch the next page. Absent on the last page."
+                    }
+                  },
+                  "required": [
+                    "restart_events"
+                  ]
+                },
+                "examples": {
+                  "returns_the_process's_restart_events,_newest_first": {
+                    "summary": "returns the process's restart events, newest first",
+                    "value": {
+                      "restart_events": [
+                        {
+                          "id": 12345,
+                          "created_at": "2026-01-01T00:00:00Z",
+                          "instance": "web.7"
+                        },
+                        {
+                          "id": 12345,
+                          "created_at": "2026-01-01T00:00:00Z",
+                          "instance": "web.3"
+                        },
+                        {
+                          "id": 12345,
+                          "created_at": "2026-01-01T00:00:00Z",
+                          "instance": "web.5"
+                        }
+                      ]
+                    }
+                  },
+                  "returns_the_events_from_the_start_of_the_window_up_to_but_not_including_its_end": {
+                    "summary": "returns the events from the start of the window up to but not including its end",
+                    "value": {
+                      "restart_events": [
+                        {
+                          "id": 12345,
+                          "created_at": "2026-01-01T00:00:00Z",
+                          "instance": "web.1"
+                        }
+                      ]
+                    }
+                  },
+                  "returns_the_page_following_a_cursor": {
+                    "summary": "returns the page following a cursor",
+                    "value": {
+                      "restart_events": [
+                        {
+                          "id": 12345,
+                          "created_at": "2026-01-01T00:00:00Z",
+                          "instance": "web.1"
+                        }
+                      ],
+                      "next_cursor": "eyJjdXJzb3IiOiJvcGFxdWUifQ--0000000000000000000000000000000000000000000000000000000000000000"
+                    }
+                  }
+                }
+              }
+            },
+            "description": "The process's instance restarts."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "tags": [
+          "Process Restart Events"
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "eyJjdXJzb3IiOiJvcGFxdWUifQ--0000000000000000000000000000000000000000000000000000000000000000",
+            "description": "`next_cursor` from a previous response. Repeat any filters alongside it."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "2026-01-01T00:00:00Z",
+            "description": "ISO 8601 timestamp. Records at or after this time."
+          },
+          {
+            "name": "process_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "2026-01-01T00:00:00Z",
+            "description": "ISO 8601 timestamp. Records strictly before this time. Must not precede `from`."
+          }
+        ],
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/processes/{process_id}/scale_events": {
+      "get": {
+        "operationId": "listProcessScaleEvents",
+        "summary": "List a process's scale events",
+        "description": "The process's scaling events, newest first. Events are kept for 4 months.",
+        "tags": [
+          "Process Scale Events"
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "eyJjdXJzb3IiOiJvcGFxdWUifQ--0000000000000000000000000000000000000000000000000000000000000000",
+            "description": "`next_cursor` from a previous response. Repeat any filters alongside it."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "2026-01-01T00:00:00Z",
+            "description": "ISO 8601 timestamp. Records at or after this time."
+          },
+          {
+            "name": "process_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "2026-01-01T00:00:00Z",
+            "description": "ISO 8601 timestamp. Records strictly before this time. Must not precede `from`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The process's scaling events.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scale_events": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ScaleEvent"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": "string",
+                      "description": "Pass as `cursor` to fetch the next page. Absent on the last page."
+                    }
+                  },
+                  "required": [
+                    "scale_events"
+                  ]
+                },
+                "examples": {
+                  "returns_the_process's_scale_events,_newest_first": {
+                    "summary": "returns the process's scale events, newest first",
+                    "value": {
+                      "scale_events": [
+                        {
+                          "id": 12345,
+                          "created_at": "2026-01-01T00:00:00Z",
+                          "previous_scale": 6,
+                          "new_scale": 2,
+                          "scale_direction": "down",
+                          "source": "external"
+                        },
+                        {
+                          "id": 12345,
+                          "created_at": "2026-01-01T00:00:00Z",
+                          "previous_scale": 4,
+                          "new_scale": 6,
+                          "scale_direction": "up",
+                          "source": "autoscale"
+                        }
+                      ]
+                    }
+                  },
+                  "reports_a_null_direction_when_the_scale_did_not_change": {
+                    "summary": "reports a null direction when the scale did not change",
+                    "value": {
+                      "scale_events": [
+                        {
+                          "id": 12345,
+                          "created_at": "2026-01-01T00:00:00Z",
+                          "previous_scale": 3,
+                          "new_scale": 3,
+                          "scale_direction": null,
+                          "source": "maintenance"
+                        }
+                      ]
+                    }
+                  },
+                  "returns_the_page_following_a_cursor": {
+                    "summary": "returns the page following a cursor",
+                    "value": {
+                      "scale_events": [
+                        {
+                          "id": 12345,
+                          "created_at": "2026-01-01T00:00:00Z",
+                          "previous_scale": 1,
+                          "new_scale": 2,
+                          "scale_direction": "up",
+                          "source": "autoscale"
+                        }
+                      ],
+                      "next_cursor": "eyJjdXJzb3IiOiJvcGFxdWUifQ--0000000000000000000000000000000000000000000000000000000000000000"
+                    }
+                  },
+                  "returns_the_events_from_the_start_of_the_window_up_to_but_not_including_its_end": {
+                    "summary": "returns the events from the start of the window up to but not including its end",
+                    "value": {
+                      "scale_events": [
+                        {
+                          "id": 12345,
+                          "created_at": "2026-01-01T00:00:00Z",
+                          "previous_scale": 1,
+                          "new_scale": 2,
+                          "scale_direction": "up",
+                          "source": "autoscale"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/processes/{process_id}/schedule": {
+      "delete": {
+        "operationId": "deleteProcessSchedule",
+        "summary": "Delete a process's schedule",
+        "description": "Deletes the entire process's schedule.",
+        "tags": [
+          "Process Schedule"
+        ],
+        "parameters": [
+          {
+            "name": "process_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The process's schedule was deleted."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "get": {
+        "operationId": "getProcessSchedule",
+        "summary": "Retrieve a process's schedule",
+        "description": "The process's schedule entries, ordered by day and time.",
+        "tags": [
+          "Process Schedule"
+        ],
+        "parameters": [
+          {
+            "name": "process_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The process's schedule.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ScheduleEntry"
+                      }
+                    }
+                  },
+                  "required": [
+                    "entries"
+                  ]
+                },
+                "examples": {
+                  "returns_the_schedule_entries_ordered_by_day_and_time": {
+                    "summary": "returns the schedule entries ordered by day and time",
+                    "value": {
+                      "entries": [
+                        {
+                          "id": 12345,
+                          "wday": 1,
+                          "time": "09:30",
+                          "min_scale": 2,
+                          "max_scale": 5
+                        },
+                        {
+                          "id": 12345,
+                          "wday": 5,
+                          "time": "22:00",
+                          "min_scale": 1,
+                          "max_scale": 3
+                        }
+                      ]
+                    }
+                  },
+                  "returns_matching_min_scale_and_max_scale_for_a_schedule-only_process": {
+                    "summary": "returns matching min_scale and max_scale for a schedule-only process",
+                    "value": {
+                      "entries": [
+                        {
+                          "id": 12345,
+                          "wday": 2,
+                          "time": "01:00",
+                          "min_scale": 4,
+                          "max_scale": 4
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createProcessSchedule",
+        "summary": "Create a process's schedule",
+        "description": "Creates the process's schedule. Omit the body to bootstrap a default one. An empty list is rejected, since a schedule needs at least one entry.",
+        "tags": [
+          "Process Schedule"
+        ],
+        "parameters": [
+          {
+            "name": "process_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The process's new schedule.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ScheduleEntry"
+                      }
+                    }
+                  },
+                  "required": [
+                    "entries"
+                  ]
+                },
+                "examples": {
+                  "bootstraps_a_default_schedule_for_a_process_that_has_none": {
+                    "summary": "bootstraps a default schedule for a process that has none",
+                    "value": {
+                      "entries": [
+                        {
+                          "id": 12345,
+                          "wday": 1,
+                          "time": "05:00",
+                          "min_scale": 1,
+                          "max_scale": 5
+                        },
+                        {
+                          "id": 12345,
+                          "wday": 5,
+                          "time": "22:00",
+                          "min_scale": 1,
+                          "max_scale": 5
+                        }
+                      ]
+                    }
+                  },
+                  "creates_the_entries_provided_in_the_body": {
+                    "summary": "creates the entries provided in the body",
+                    "value": {
+                      "entries": [
+                        {
+                          "id": 12345,
+                          "wday": 1,
+                          "time": "09:00",
+                          "min_scale": 2,
+                          "max_scale": 5
+                        },
+                        {
+                          "id": 12345,
+                          "wday": 5,
+                          "time": "22:00",
+                          "min_scale": 1,
+                          "max_scale": 3
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "entries": {
+                    "description": "The schedule entries to create. Omit entirely to bootstrap a default schedule.",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "wday": {
+                          "description": "Day of week, 0 (Sunday) through 6 (Saturday).",
+                          "type": "integer"
+                        },
+                        "time": {
+                          "description": "Time of day the entry starts, in `HH:MM`, in the process's `schedule_time_zone`.",
+                          "type": "string"
+                        },
+                        "min_scale": {
+                          "description": "The floor of the scale for this window, in instances. `0` may be set for a worker, or a process autoscaling on `scaling_schedule`.",
+                          "type": "integer"
+                        },
+                        "max_scale": {
+                          "description": "The ceiling of the scale for this window, in instances. For a process autoscaling on `scaling_schedule`, it must match `min_scale` or be left out.",
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "wday",
+                        "time",
+                        "min_scale",
+                        "max_scale"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "entries"
+                ]
+              },
+              "example": {
+                "entries": [
+                  {
+                    "wday": 1,
+                    "time": "09:00",
+                    "min_scale": 2,
+                    "max_scale": 5
+                  },
+                  {
+                    "wday": 5,
+                    "time": "22:00",
+                    "min_scale": 1,
+                    "max_scale": 3
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateProcessSchedule",
+        "summary": "Update a process's schedule",
+        "description": "Replaces the process's schedule: an entry with a matching id is updated, one without an id is created (and must give every field the same way create does), and any left out of the list are deleted.",
+        "tags": [
+          "Process Schedule"
+        ],
+        "parameters": [
+          {
+            "name": "process_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 12345
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "entries": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "wday": {
+                          "description": "Day of week, 0 (Sunday) through 6 (Saturday).",
+                          "type": "integer"
+                        },
+                        "time": {
+                          "description": "Time of day the entry starts, in `HH:MM`, in the process's `schedule_time_zone`.",
+                          "type": "string"
+                        },
+                        "min_scale": {
+                          "description": "The floor of the scale for this window, in instances. `0` may be set for a worker, or a process autoscaling on `scaling_schedule`.",
+                          "type": "integer"
+                        },
+                        "max_scale": {
+                          "description": "The ceiling of the scale for this window, in instances. For a process autoscaling on `scaling_schedule`, it must match `min_scale` or be left out.",
+                          "type": "integer"
+                        },
+                        "id": {
+                          "description": "An existing entry to keep. Send it alone to keep the entry as it is, or alongside the fields you want to change.",
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "entries"
+                ]
+              },
+              "examples": {
+                "replaces_every_entry_when_none_are_given_an_id": {
+                  "summary": "replaces every entry when none are given an id",
+                  "value": {
+                    "entries": [
+                      {
+                        "wday": 1,
+                        "time": "09:00",
+                        "min_scale": 2,
+                        "max_scale": 5
+                      },
+                      {
+                        "wday": 5,
+                        "time": "22:00",
+                        "min_scale": 1,
+                        "max_scale": 3
+                      }
+                    ]
+                  }
+                },
+                "keeps_an_entry_given_by_id_alone,_and_deletes_the_ones_left_out": {
+                  "summary": "keeps an entry given by id alone, and deletes the ones left out",
+                  "value": {
+                    "entries": [
+                      {
+                        "id": 12345
+                      }
+                    ]
+                  }
+                },
+                "updates_only_the_fields_sent_alongside_an_id": {
+                  "summary": "updates only the fields sent alongside an id",
+                  "value": {
+                    "entries": [
+                      {
+                        "id": 12345,
+                        "time": "06:00"
+                      }
+                    ]
+                  }
+                },
+                "creates_a_new_entry_alongside_the_ones_it_keeps": {
+                  "summary": "creates a new entry alongside the ones it keeps",
+                  "value": {
+                    "entries": [
+                      {
+                        "id": 12345
+                      },
+                      {
+                        "wday": 6,
+                        "time": "23:00",
+                        "min_scale": 1,
+                        "max_scale": 2
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The process's updated schedule.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ScheduleEntry"
+                      }
+                    }
+                  },
+                  "required": [
+                    "entries"
+                  ]
+                },
+                "examples": {
+                  "replaces_every_entry_when_none_are_given_an_id": {
+                    "summary": "replaces every entry when none are given an id",
+                    "value": {
+                      "entries": [
+                        {
+                          "id": 12345,
+                          "wday": 1,
+                          "time": "09:00",
+                          "min_scale": 2,
+                          "max_scale": 5
+                        },
+                        {
+                          "id": 12345,
+                          "wday": 5,
+                          "time": "22:00",
+                          "min_scale": 1,
+                          "max_scale": 3
+                        }
+                      ]
+                    }
+                  },
+                  "keeps_an_entry_given_by_id_alone,_and_deletes_the_ones_left_out": {
+                    "summary": "keeps an entry given by id alone, and deletes the ones left out",
+                    "value": {
+                      "entries": [
+                        {
+                          "id": 12345,
+                          "wday": 1,
+                          "time": "05:00",
+                          "min_scale": 1,
+                          "max_scale": 3
+                        }
+                      ]
+                    }
+                  },
+                  "updates_only_the_fields_sent_alongside_an_id": {
+                    "summary": "updates only the fields sent alongside an id",
+                    "value": {
+                      "entries": [
+                        {
+                          "id": 12345,
+                          "wday": 1,
+                          "time": "06:00",
+                          "min_scale": 2,
+                          "max_scale": 6
+                        }
+                      ]
+                    }
+                  },
+                  "creates_a_new_entry_alongside_the_ones_it_keeps": {
+                    "summary": "creates a new entry alongside the ones it keeps",
+                    "value": {
+                      "entries": [
+                        {
+                          "id": 12345,
+                          "wday": 1,
+                          "time": "05:00",
+                          "min_scale": 1,
+                          "max_scale": 3
+                        },
+                        {
+                          "id": 12345,
+                          "wday": 6,
+                          "time": "23:00",
+                          "min_scale": 1,
+                          "max_scale": 2
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/team": {
+      "get": {
+        "operationId": "getTeam",
+        "summary": "Retrieve the team",
+        "description": "The current team information, its subscription with plan limits (if applicable), and the calling token.",
+        "tags": [
+          "Team"
+        ],
+        "responses": {
+          "200": {
+            "description": "The team, its subscription with plan limits, and the calling token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                },
+                "examples": {
+                  "returns_the_team_and_the_calling_api_token's_info": {
+                    "summary": "returns the team and the calling api token's info",
+                    "value": {
+                      "id": 12345,
+                      "name": "Acme Inc",
+                      "otp_required": false,
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "api_token": {
+                        "id": 12345,
+                        "label": "CI integration",
+                        "role": "admin",
+                        "read_only": false,
+                        "last_used_on": "2026-01-01",
+                        "created_at": "2026-01-01T00:00:00Z"
+                      },
+                      "subscription": null
+                    }
+                  },
+                  "returns_the_subscription_of_a_directly_billed_team": {
+                    "summary": "returns the subscription of a directly billed team",
+                    "value": {
+                      "id": 12345,
+                      "name": "Acme Inc",
+                      "otp_required": false,
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "subscription": {
+                        "plan": "Orange Belt",
+                        "legacy": false,
+                        "status": "active",
+                        "limits": {
+                          "max_scale": 10,
+                          "max_perf_scale": 3
+                        },
+                        "autoscale_events": {
+                          "limit": null,
+                          "remaining": null
+                        }
+                      },
+                      "api_token": {
+                        "id": 12345,
+                        "label": "Ops integration",
+                        "role": "member",
+                        "read_only": false,
+                        "last_used_on": "2026-01-01",
+                        "created_at": "2026-01-01T00:00:00Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "updateTeam",
+        "summary": "Update the team",
+        "description": "Updates the team's settings.",
+        "tags": [
+          "Team"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "description": "The team's display name.",
+                    "type": "string"
+                  },
+                  "otp_required": {
+                    "description": "Whether members must set up two-factor authentication to sign in.",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "name",
+                  "otp_required"
+                ]
+              },
+              "example": {
+                "name": "Acme Corp",
+                "otp_required": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                },
+                "examples": {
+                  "updates_the_team": {
+                    "summary": "updates the team",
+                    "value": {
+                      "id": 12345,
+                      "name": "Acme Corp",
+                      "otp_required": true,
+                      "created_at": "2026-01-01T00:00:00Z",
+                      "api_token": {
+                        "id": 12345,
+                        "label": "CI integration",
+                        "role": "admin",
+                        "read_only": false,
+                        "last_used_on": "2026-01-01",
+                        "created_at": "2026-01-01T00:00:00Z"
+                      },
+                      "subscription": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Team",
+      "description": "A team is your Judoscale account: it owns your apps and members. Most teams are billed\ndirectly and will include their current subscription status, except for the Heroku\nAdd-ons where each app has its own subscription with Heroku.\n"
+    },
+    {
+      "name": "Memberships",
+      "description": "A membership is a person's access to a team, with a role (member or admin) that controls\nwhat they can do.\n"
+    },
+    {
+      "name": "API Tokens",
+      "description": "An API token authenticates requests to this API. Each token is scoped to a team and has a\nrole (member or admin) and an access level (read-only or read & write).\n"
+    },
+    {
+      "name": "Apps",
+      "description": "An app is an application (group of processes) linked from your platform account\n(Heroku, Fly, Render, etc.) that Judoscale monitors and autoscales.\n\nHeroku Add-on apps include their respective subscription and plan limits.\n\nYour platform may use a different name for an \"app\", such as \"cluster\" or \"project environment\".\n"
+    },
+    {
+      "name": "App Maintenance",
+      "description": "Maintenance mode allows you to pause autoscaling for an entire app, and resume it again\nwhen ready, without having to disable autoscaling for each process.\n\nThis is useful when handling tasks such as scheduled maintenance, to prevent Judoscale from\nmanaging your app's scale temporarily.\n\nEnabling maintenance will scale worker processes down to 0, and disabling it will scale them\nback to their previous values. Web processes are unchanged, and no autoscaling will trigger.\n"
+    },
+    {
+      "name": "Processes",
+      "description": "A process is a component of an app, such as web or worker, that autoscales independently,\nwith its own scale range, metrics, and schedule.\n\nYour platform may use a different name for a \"process\", such as \"service\" or \"container type\".\n"
+    },
+    {
+      "name": "Process Autoscale Metrics",
+      "description": "Autoscaling drives a process's scale up or down based on one or more metrics, such as queue\ntime or utilization. This is where you see which metrics are available and which currently\ndrive autoscaling for a given process. Note that a scaling schedule is also considered a metric\nsince it drives autoscaling.\n"
+    },
+    {
+      "name": "Process Metrics",
+      "description": "Metrics are the raw performance data Judoscale collects for a process, independent of\nwhether they're used for autoscaling.\n"
+    },
+    {
+      "name": "Process Restart Events",
+      "description": "When sniping is enabled on a process (and its platform supports it), Judoscale may restart an\ninstance whose metrics stay well above the rest of the fleet, to clear a stuck or degraded one.\nOnly web processes are eligible for restarts. This is a record of those restarts.\n"
+    },
+    {
+      "name": "Process Scale Events",
+      "description": "A scale event is any change to a process's instance count, regardless of the source, such\nas an autoscale or an external change.\n"
+    },
+    {
+      "name": "Process Schedule",
+      "description": "A schedule sets a process's scale for specific days and times, letting it autoscale\ndifferently (or not at all) on a fixed calendar.\n\nFor a process autoscaling on `scaling_schedule`, an entry's `min_scale` and `max_scale` are\nalways equal, since the schedule is the process's only scale signal; otherwise they set the\nautoscaling range for that window.\n\nEach entry's `time` is interpreted in the process's `schedule_time_zone`. Changing that time\nzone shifts every entry's `time` and `wday` to keep firing at the same moment.\n"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Team API token, sent as `Authorization: Bearer jdo_...`."
+      }
+    },
+    "schemas": {
+      "ApiToken": {
+        "description": "Authenticates requests to this API.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "label": {
+            "description": "Names the token so you can tell your tokens apart. Must be unique within the team.",
+            "type": "string"
+          },
+          "role": {
+            "description": "An admin token can manage the team and who belongs to it.",
+            "type": "string",
+            "enum": [
+              "member",
+              "admin"
+            ]
+          },
+          "read_only": {
+            "description": "A read-only token may only make GET requests.",
+            "type": "boolean"
+          },
+          "last_used_on": {
+            "description": "The last date this token was used, or null if it never has been.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "role",
+          "read_only",
+          "last_used_on",
+          "created_at"
+        ]
+      },
+      "App": {
+        "description": "A linked application Judoscale monitors and autoscales.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "description": "Synced from the platform, can't be changed.",
+            "type": "string"
+          },
+          "maintenance_enabled_at": {
+            "description": "When maintenance mode was enabled, or null if it's off.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "webhook_url": {
+            "description": "Where Judoscale posts scaling notifications for this app, or null if none is set.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "subscription": {
+            "description": "The add-on subscription for this app. Null when Judoscale bills the team directly, in which case the subscription belongs to the team instead.",
+            "$ref": "#/components/schemas/Subscription"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "maintenance_enabled_at",
+          "webhook_url",
+          "created_at",
+          "subscription"
+        ]
+      },
+      "AutoscaleMetric": {
+        "description": "A metric this process autoscales on. Thresholds are omitted for `scaling_schedule`, which scales on the schedule rather than a measured value.",
+        "type": "object",
+        "properties": {
+          "metric": {
+            "description": "Valid values depend on the process type:\n- web: `queue_time`, `utilization`, `response_time`, `scaling_schedule`\n- worker: `queue_time`, `queue_depth`, `scaling_schedule`",
+            "type": "string",
+            "enum": [
+              "queue_time",
+              "queue_depth",
+              "utilization",
+              "response_time",
+              "scaling_schedule"
+            ]
+          },
+          "upscale_threshold": {
+            "description": "The value above which this metric triggers an upscale, in the metric's own unit (see the metrics endpoint).",
+            "type": "integer"
+          },
+          "downscale_threshold": {
+            "description": "The value below which this metric triggers a downscale, in the metric's own unit (see the metrics endpoint).",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "metric"
+        ]
+      },
+      "AutoscaleMetricStatus": {
+        "description": "A metric's availability and autoscaling state for a process.",
+        "type": "object",
+        "properties": {
+          "metric": {
+            "description": "Only the metrics that apply to this process type are listed.",
+            "type": "string",
+            "enum": [
+              "queue_time",
+              "queue_depth",
+              "utilization",
+              "response_time",
+              "scaling_schedule"
+            ]
+          },
+          "enabled": {
+            "description": "Whether this metric currently drives the process's autoscaling.",
+            "type": "boolean"
+          },
+          "has_recent_metrics": {
+            "description": "Whether the process has reported this metric in the last few minutes. Null for anything that doesn't have metrics, such as a scaling schedule. A metric can be enabled without reporting.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "metric",
+          "enabled",
+          "has_recent_metrics"
+        ]
+      },
+      "Membership": {
+        "description": "A person's access to a team.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "description": "Admins can manage the team and who belongs to it.",
+            "type": "string",
+            "enum": [
+              "member",
+              "admin"
+            ]
+          },
+          "invitation_pending": {
+            "description": "They have been invited but haven't signed up yet.",
+            "type": "boolean"
+          },
+          "otp_status": {
+            "description": "Whether they have two-factor authentication enabled. Members who sign in through SSO cannot set it up.",
+            "type": "string",
+            "enum": [
+              "enabled",
+              "disabled",
+              "sso_only"
+            ]
+          },
+          "synced": {
+            "description": "True when this membership is synced from the team's platform (e.g. Heroku) and can't be changed directly.",
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "role",
+          "invitation_pending",
+          "otp_status",
+          "synced",
+          "created_at"
+        ]
+      },
+      "Metric": {
+        "description": "A metric Judoscale can report for a process.",
+        "type": "object",
+        "properties": {
+          "metric": {
+            "description": "Valid values depend on the process type:\n- web: `queue_time`, `utilization`, `response_time`, `rps`\n- worker: `queue_time`, `queue_depth`, `queue_busy`",
+            "type": "string",
+            "enum": [
+              "queue_time",
+              "utilization",
+              "response_time",
+              "rps",
+              "queue_depth",
+              "queue_busy"
+            ]
+          },
+          "unit": {
+            "description": "How the metric's values are measured.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "metric",
+          "unit"
+        ]
+      },
+      "MetricSeries": {
+        "description": "A metric's data points over a time window.",
+        "type": "object",
+        "properties": {
+          "metric": {
+            "description": "Valid values depend on the process type:\n- web: `queue_time`, `utilization`, `response_time`, `rps`\n- worker: `queue_time`, `queue_depth`, `queue_busy`",
+            "type": "string",
+            "enum": [
+              "queue_time",
+              "utilization",
+              "response_time",
+              "rps",
+              "queue_depth",
+              "queue_busy"
+            ]
+          },
+          "unit": {
+            "description": "How the metric's values are measured.",
+            "type": "string"
+          },
+          "bucket_width_seconds": {
+            "description": "Width of each bucket, in seconds, determined by the time window.",
+            "type": "integer"
+          },
+          "points": {
+            "description": "One data point per bucket, oldest first. A bucket with no reported data has a value of 0.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "description": "Start of the bucket.",
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "value": {
+                  "type": "number",
+                  "format": "float"
+                }
+              },
+              "required": [
+                "time",
+                "value"
+              ]
+            }
+          }
+        },
+        "required": [
+          "metric",
+          "unit",
+          "bucket_width_seconds",
+          "points"
+        ]
+      },
+      "MetricSeriesPerInstance": {
+        "description": "A metric's data points over a time window, split by instance.",
+        "type": "object",
+        "properties": {
+          "metric": {
+            "type": "string",
+            "enum": [
+              "queue_time",
+              "response_time"
+            ]
+          },
+          "unit": {
+            "description": "How the metric's values are measured.",
+            "type": "string"
+          },
+          "bucket_width_seconds": {
+            "description": "Width of each bucket, in seconds, determined by the time window.",
+            "type": "integer"
+          },
+          "instances": {
+            "description": "One entry per instance, each covering the same buckets.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "instance": {
+                  "description": "The platform's identifier for the instance, such as `web.1`.",
+                  "type": "string"
+                },
+                "points": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "time": {
+                        "description": "Start of the bucket.",
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "value": {
+                        "type": "number",
+                        "format": "float"
+                      }
+                    },
+                    "required": [
+                      "time",
+                      "value"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "instance",
+                "points"
+              ]
+            }
+          }
+        },
+        "required": [
+          "metric",
+          "unit",
+          "bucket_width_seconds",
+          "instances"
+        ]
+      },
+      "Process": {
+        "description": "A component of an app, such as web or worker, that autoscales independently.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "app_id": {
+            "type": "integer"
+          },
+          "name": {
+            "description": "Synced from the platform, can't be changed.",
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "web",
+              "worker"
+            ]
+          },
+          "autoscaling_enabled": {
+            "description": "Whether autoscaling is currently enabled on this process.",
+            "type": "boolean"
+          },
+          "current_scale": {
+            "description": "The process's current instance count.",
+            "type": "integer"
+          },
+          "min_scale": {
+            "description": "The floor of the autoscaling range, in instances. `0` may be set for a worker, or a process autoscaling on `scaling_schedule`.",
+            "type": "integer"
+          },
+          "max_scale": {
+            "description": "The ceiling of the autoscaling range, in instances.",
+            "type": "integer"
+          },
+          "upscale_quantity": {
+            "description": "How many instances to add on an upscale.",
+            "type": "integer"
+          },
+          "dynamic_upscale_jumps": {
+            "description": "When enabled, a throughput spike chooses the upscale jump. The smallest jump is 1. `upscale_quantity` applies only while this is off. Web processes only, and included only when the team has the dynamic-upscale-jumps feature enabled and the process is reporting recent utilization.",
+            "type": "boolean"
+          },
+          "upscale_interval_seconds": {
+            "description": "Minimum time between upscales, in seconds.",
+            "type": "integer"
+          },
+          "upscale_sensitivity_seconds": {
+            "description": "How long a metric must stay above its threshold before triggering an upscale, in seconds. Must be one of 10, 20, 30.",
+            "type": "integer"
+          },
+          "downscale_quantity": {
+            "description": "How many instances to remove on a downscale.",
+            "type": "integer"
+          },
+          "downscale_interval_seconds": {
+            "description": "Minimum time between downscales, in seconds.",
+            "type": "integer"
+          },
+          "schedule_time_zone": {
+            "description": "The time zone schedule entries are interpreted in. Changing it shifts existing entries' time and wday by the time difference, so they keep firing at the same moment.",
+            "type": "string"
+          },
+          "autoscale_metrics": {
+            "description": "The metrics currently driving this process's autoscaling. Empty means the process still needs setup.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutoscaleMetric"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sniping_enabled": {
+            "description": "Automatically restarts instances whose metrics stay well above the rest of the fleet. Web processes only, and only on platforms that support it.",
+            "type": "boolean"
+          },
+          "protect_long_jobs": {
+            "description": "Wait for in-flight jobs to finish before scaling this worker down. Worker processes only, requires `queue_busy` metric.",
+            "type": "boolean"
+          },
+          "all_queues": {
+            "description": "Autoscale on all queues instead of just the ones in `queue_names`. Worker processes only.",
+            "type": "boolean"
+          },
+          "queue_names": {
+            "description": "The specific queues to autoscale on, used when `all_queues` is false. Worker processes only.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "app_id",
+          "name",
+          "type",
+          "autoscaling_enabled",
+          "current_scale",
+          "min_scale",
+          "max_scale",
+          "upscale_quantity",
+          "upscale_interval_seconds",
+          "upscale_sensitivity_seconds",
+          "downscale_quantity",
+          "downscale_interval_seconds",
+          "schedule_time_zone",
+          "autoscale_metrics",
+          "created_at"
+        ]
+      },
+      "RestartEvent": {
+        "description": "A record of an instance Judoscale restarted.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "instance": {
+            "description": "The platform's identifier for the restarted instance, such as `web.1`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "instance"
+        ]
+      },
+      "ScaleEvent": {
+        "description": "A change to a process's instance count.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "previous_scale": {
+            "description": "The instance count before this event.",
+            "type": "integer"
+          },
+          "new_scale": {
+            "description": "The instance count after this event.",
+            "type": "integer"
+          },
+          "scale_direction": {
+            "description": "Null when the scale did not change.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "up",
+              "down",
+              null
+            ]
+          },
+          "source": {
+            "description": "`autoscale` when Judoscale changed the scale, `external` when it changed outside Judoscale (e.g. the platform dashboard or CLI), or `maintenance` when maintenance mode changed it.",
+            "type": "string",
+            "enum": [
+              "autoscale",
+              "external",
+              "maintenance"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "previous_scale",
+          "new_scale",
+          "scale_direction",
+          "source"
+        ]
+      },
+      "ScheduleEntry": {
+        "description": "A day, time, and scale for a process to autoscale on.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "wday": {
+            "description": "Day of week, 0 (Sunday) through 6 (Saturday).",
+            "type": "integer"
+          },
+          "time": {
+            "description": "Time of day the entry starts, in `HH:MM`, in the process's `schedule_time_zone`.",
+            "type": "string"
+          },
+          "min_scale": {
+            "description": "The floor of the scale for this window, in instances. `0` may be set for a worker, or a process autoscaling on `scaling_schedule`.",
+            "type": "integer"
+          },
+          "max_scale": {
+            "description": "The ceiling of the scale for this window, in instances. Equals `min_scale` for a process autoscaling on `scaling_schedule`.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "wday",
+          "time",
+          "min_scale",
+          "max_scale"
+        ]
+      },
+      "Subscription": {
+        "description": "A billing plan, its status, and its limits.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "plan": {
+            "description": "The plan's display name, e.g. \"Orange Belt\".",
+            "type": "string"
+          },
+          "legacy": {
+            "description": "This plan is no longer offered for new subscriptions.",
+            "type": "boolean"
+          },
+          "status": {
+            "description": "Anything other than `active` means the last payment did not go through.",
+            "enum": [
+              "active",
+              "past_due",
+              "unpaid"
+            ],
+            "type": "string"
+          },
+          "limits": {
+            "description": "How far the plan allows scaling. Null means no limit, and a `max_perf_scale` of 0 means the plan has no performance instances.",
+            "type": "object",
+            "properties": {
+              "max_scale": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "max_perf_scale": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "max_scale",
+              "max_perf_scale"
+            ]
+          },
+          "autoscale_events": {
+            "description": "Autoscales allowed per month, and how many are left. Null on plans that do not meter them.",
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "remaining": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "limit",
+              "remaining"
+            ]
+          }
+        },
+        "required": [
+          "plan",
+          "legacy",
+          "status",
+          "limits",
+          "autoscale_events"
+        ]
+      },
+      "Team": {
+        "description": "Your Judoscale account: owns your apps and members.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "description": "The team's display name.",
+            "type": "string"
+          },
+          "otp_required": {
+            "description": "Whether members must set up two-factor authentication to sign in.",
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "api_token": {
+            "$ref": "#/components/schemas/ApiToken"
+          },
+          "subscription": {
+            "description": "The team's subscription, when Judoscale bills the team directly. Null for add-on customers, whose subscription belongs to each app instead.",
+            "$ref": "#/components/schemas/Subscription"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "otp_required",
+          "created_at",
+          "subscription",
+          "api_token"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "type",
+              "message"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Machine-readable error category, e.g. authentication_error."
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable explanation."
+              },
+              "param": {
+                "type": "string",
+                "description": "The offending parameter, for validation errors."
+              }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Missing or invalid API token.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "type": "authentication_error",
+                "message": "Invalid API token."
+              }
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "Too many requests; the rate limit was exceeded.",
+        "headers": {
+          "Retry-After": {
+            "description": "Seconds to wait before retrying.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "type": "rate_limit_error",
+                "message": "Too many requests. Try again later."
+              }
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "The token lacks permission for this action.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "type": "permission_error",
+                "message": "This token is read-only."
+              }
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "The requested resource does not exist.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "type": "not_found",
+                "message": "The requested resource was not found."
+              }
+            }
+          }
+        }
+      },
+      "UnprocessableEntity": {
+        "description": "The request was malformed or failed validation.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "type": "invalid_request_error",
+                "message": "param is missing or the value is empty: id",
+                "param": "id"
+              }
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "An unexpected error occurred on our end.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "type": "api_error",
+                "message": "Something went wrong."
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
