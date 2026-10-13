@@ -1,6 +1,6 @@
 # Judoscale CLI
 
-Official command line client for the [Judoscale Team API](https://judoscale.com). Built for humans, CI and AI agents: JSON output by default, a single static binary.
+Official command line client for [Judoscale](https://judoscale.com). Built for humans, CI and AI agents: JSON output by default, a single static binary.
 
 ## Install
 

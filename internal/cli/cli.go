@@ -130,7 +130,7 @@ func (a *App) printJSON(body []byte) error {
 
 func (a *App) rootHelp() error {
 	w := a.Stdout
-	fmt.Fprint(w, `judo: command line client for the Judoscale Team API
+	fmt.Fprint(w, `judo: command line client for Judoscale
 
 Usage: judo <command> [arguments] [flags]
 
