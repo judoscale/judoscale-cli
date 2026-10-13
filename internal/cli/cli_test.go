@@ -129,7 +129,7 @@ func TestUnknownCommand(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	if res := run(t, nil, nil, "", "version"); res.stdout != "judoscale dev\n" {
+	if res := run(t, nil, nil, "", "version"); res.stdout != "judo dev\n" {
 		t.Errorf("%+v", res)
 	}
 }

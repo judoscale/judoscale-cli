@@ -9,17 +9,17 @@ import (
 	"strings"
 )
 
-const apiHelp = `Make a raw API request and print the JSON response.
+var apiHelp = fmt.Sprintf(`Make a raw API request and print the JSON response.
 
-Usage: judoscale api <METHOD> <path> [flags]
+Usage: %[1]s api <METHOD> <path> [flags]
 
 Flags:
   -d, --data string  JSON request body; use - to read it from stdin
       --all          Follow next_cursor and merge all pages (GET only)
 
 Example:
-  judoscale api GET /v1/apps
-`
+  %[1]s api GET /v1/apps
+`, binName)
 
 func (a *App) runAPI(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("api", flag.ContinueOnError)
@@ -37,7 +37,7 @@ func (a *App) runAPI(ctx context.Context, args []string) error {
 		return err
 	}
 	if len(pos) != 2 {
-		return usagef("usage: judoscale api <METHOD> <path> [flags]")
+		return usagef("usage: %s api <METHOD> <path> [flags]", binName)
 	}
 	method, path := strings.ToUpper(pos[0]), pos[1]
 	if all && method != http.MethodGet {

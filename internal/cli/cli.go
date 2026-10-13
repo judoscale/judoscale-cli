@@ -13,6 +13,9 @@ import (
 	"github.com/judoscale/judoscale-cli/internal/client"
 )
 
+// binName is the command name shown in help and usage text.
+const binName = "judo"
+
 const (
 	exitOK    = 0
 	exitError = 1
@@ -56,12 +59,12 @@ func (a *App) run(ctx context.Context, args []string) error {
 	case "help", "-h", "--help":
 		return a.rootHelp()
 	case "version", "--version":
-		fmt.Fprintln(a.Stdout, "judoscale", a.Version)
+		fmt.Fprintln(a.Stdout, binName, a.Version)
 		return nil
 	case "api":
 		return a.runAPI(ctx, rest)
 	}
-	return usagef("unknown command %q; run `judoscale help` to list commands", name)
+	return usagef("unknown command %q; run `%s help` to list commands", name, binName)
 }
 
 func (a *App) baseURL() string {
@@ -100,9 +103,9 @@ func (a *App) printJSON(body []byte) error {
 }
 
 func (a *App) rootHelp() error {
-	fmt.Fprint(a.Stdout, `judoscale: command line client for the Judoscale Team API
+	fmt.Fprintf(a.Stdout, `%[1]s: command line client for the Judoscale Team API
 
-Usage: judoscale <command> [arguments] [flags]
+Usage: %[1]s <command> [arguments] [flags]
 
 Environment:
   JUDOSCALE_API_TOKEN  API token (required for API commands)
@@ -112,7 +115,7 @@ Commands:
   api      Make a raw API request: api <METHOD> <path>
   version  Print the CLI version
 
-Run `+"`judoscale <command> --help`"+` for details.
-`)
+Run `+"`%[1]s <command> --help`"+` for details.
+`, binName)
 	return nil
 }
