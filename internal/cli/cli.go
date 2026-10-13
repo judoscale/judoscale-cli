@@ -8,9 +8,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"path/filepath"
+	"sort"
+	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/judoscale/judoscale-cli/internal/client"
+	"github.com/judoscale/judoscale-cli/internal/spec"
 )
 
 const (
@@ -61,7 +67,30 @@ func (a *App) run(ctx context.Context, args []string) error {
 	case "api":
 		return a.runAPI(ctx, rest)
 	}
+
+	s, err := a.loadSpec()
+	if err != nil {
+		return err
+	}
+	if op := findCommand(s, name); op != nil {
+		return a.runOperation(ctx, *op, rest)
+	}
 	return usagef("unknown command %q; run `judo help` to list commands", name)
+}
+
+func (a *App) specDir() string {
+	if a.ConfigDir == "" {
+		return ""
+	}
+	return filepath.Join(a.ConfigDir, "judoscale")
+}
+
+func (a *App) loadSpec() (*spec.Spec, error) {
+	s, warning, err := spec.Load(a.specDir(), a.Version)
+	if warning != "" {
+		fmt.Fprintln(a.Stderr, "Warning:", warning)
+	}
+	return s, err
 }
 
 func (a *App) baseURL() string {
@@ -100,7 +129,8 @@ func (a *App) printJSON(body []byte) error {
 }
 
 func (a *App) rootHelp() error {
-	fmt.Fprint(a.Stdout, `judo: command line client for the Judoscale Team API
+	w := a.Stdout
+	fmt.Fprint(w, `judo: command line client for the Judoscale Team API
 
 Usage: judo <command> [arguments] [flags]
 
@@ -109,10 +139,54 @@ Environment:
   JUDOSCALE_API_URL    API base URL (default https://api.judoscale.com)
 
 Commands:
-  api      Make a raw API request: api <METHOD> <path>
-  version  Print the CLI version
-
-Run `+"`judo <command> --help`"+` for details.
 `)
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "  api\tMake a raw API request: api <METHOD> <path>")
+	fmt.Fprintln(tw, "  version\tPrint the CLI version")
+	if s, err := a.loadSpec(); err == nil {
+		for _, op := range commandOps(s) {
+			fmt.Fprintf(tw, "  %s\t%s\n", commandName(op), op.Summary)
+		}
+	}
+	tw.Flush()
+	fmt.Fprintln(w, "\nRun `judo <command> --help` for details.")
+	return nil
+}
+
+func commandName(op spec.Operation) string { return kebab(op.ID) }
+
+// kebab converts an operationId like getProcessMetricSeries to get-process-metric-series.
+func kebab(id string) string {
+	var b strings.Builder
+	for i, r := range id {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {
+				b.WriteByte('-')
+			}
+			r += 'a' - 'A'
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// commandOps returns the operations exposed as commands: read-only ones.
+func commandOps(s *spec.Spec) []spec.Operation {
+	var ops []spec.Operation
+	for _, op := range s.Operations {
+		if op.Method == http.MethodGet {
+			ops = append(ops, op)
+		}
+	}
+	sort.Slice(ops, func(i, j int) bool { return commandName(ops[i]) < commandName(ops[j]) })
+	return ops
+}
+
+func findCommand(s *spec.Spec, name string) *spec.Operation {
+	for _, op := range commandOps(s) {
+		if commandName(op) == name {
+			return &op
+		}
+	}
 	return nil
 }
