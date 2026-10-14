@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Vet and test everything, as CI does: script/test [go test args]
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+go vet ./...
+go test ./... "$@"

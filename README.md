@@ -57,9 +57,8 @@ The binary embeds a snapshot of the spec. `judo update` downloads `<base url>/op
 ## Development
 
 ```sh
-go vet ./...
-go test ./...
-go build -o judo ./cmd/judo
+script/test   # go vet + go test
+script/build
 ```
 
-The embedded snapshot lives in `internal/spec/openapi.json`. Refresh it with `script/update-spec [base-url]` (production by default; requires `jq`), which downloads the spec through `judo update`, drops examples and points `servers` at production.
+The embedded snapshot lives in `internal/spec/openapi.json`. Refresh it with `script/update-spec [base-url]` (production by default; requires `jq`), which downloads the spec through `judo update`, drops examples and points `servers` at production. Run `script/build` afterwards to embed it.

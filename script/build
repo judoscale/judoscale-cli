@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Build the judo binary at the repo root, embedding the current spec snapshot: script/build
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+go build -o judo ./cmd/judo
+
+echo "Built ./judo"
