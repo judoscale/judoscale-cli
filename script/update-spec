@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Refresh the embedded spec snapshot: script/update-spec [base-url]
+# Downloads the spec with `judo update`, drops examples and points servers at production.
+# Requires jq 1.6+.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+base_url="${1:-https://api.judoscale.com}"
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+go build -o "$tmp/judo" ./cmd/judo
+XDG_CONFIG_HOME="$tmp/config" JUDOSCALE_API_URL="$base_url" "$tmp/judo" update
+
+jq 'walk(if type == "object" then del(.example, .examples) else . end)
+    | .servers = [{"url": "https://api.judoscale.com"}]' \
+  "$tmp/config/judoscale/openapi.json" > "$tmp/openapi.json"
+mv "$tmp/openapi.json" internal/spec/openapi.json
+
+echo "Wrote internal/spec/openapi.json"

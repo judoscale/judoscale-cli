@@ -1122,10 +1122,6 @@
                     "description": "How many instances to add on an upscale.",
                     "type": "integer"
                   },
-                  "dynamic_upscale_jumps": {
-                    "description": "When enabled, a throughput spike chooses the upscale jump. The smallest jump is 1. `upscale_quantity` applies only while this is off. Web processes only, and included only when the team has the dynamic-upscale-jumps feature enabled and the process is reporting recent utilization.",
-                    "type": "boolean"
-                  },
                   "upscale_interval_seconds": {
                     "description": "Minimum time between upscales, in seconds.",
                     "type": "integer"
@@ -2639,10 +2635,6 @@
           "upscale_quantity": {
             "description": "How many instances to add on an upscale.",
             "type": "integer"
-          },
-          "dynamic_upscale_jumps": {
-            "description": "When enabled, a throughput spike chooses the upscale jump. The smallest jump is 1. `upscale_quantity` applies only while this is off. Web processes only, and included only when the team has the dynamic-upscale-jumps feature enabled and the process is reporting recent utilization.",
-            "type": "boolean"
           },
           "upscale_interval_seconds": {
             "description": "Minimum time between upscales, in seconds.",
