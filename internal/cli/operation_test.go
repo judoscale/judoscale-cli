@@ -17,11 +17,11 @@ func TestOperationPathParam(t *testing.T) {
 		w.Write([]byte(`{"processes":[]}`))
 	})
 
-	res := run(t, srv, nil, "", "list-app-processes", "42")
+	res := run(t, srv, nil, "", "processes", "list", "42")
 	if res.code != 0 || !strings.Contains(res.stdout, `"processes"`) {
 		t.Errorf("%+v", res)
 	}
-	if res := run(t, srv, nil, "", "list-app-processes"); res.code != 2 || !strings.Contains(res.stderr, "usage: judo list-app-processes <app_id>") {
+	if res := run(t, srv, nil, "", "processes", "list"); res.code != 2 || !strings.Contains(res.stderr, "usage: judo processes list <app_id>") {
 		t.Errorf("missing arg: %+v", res)
 	}
 }
@@ -35,14 +35,14 @@ func TestOperationFlagsAfterPositionals(t *testing.T) {
 		w.Write([]byte(`{}`))
 	})
 
-	res := run(t, srv, nil, "", "get-process-metric-series", "7", "--from", "A", "queue_time", "--to=B")
+	res := run(t, srv, nil, "", "metrics", "get-series", "7", "--from", "A", "queue_time", "--to=B")
 	if res.code != 0 {
 		t.Errorf("%+v", res)
 	}
 }
 
 func TestOperationRequiredFlag(t *testing.T) {
-	res := run(t, nil, nil, "", "get-process-metric-series", "7", "queue_time", "--from", "A")
+	res := run(t, nil, nil, "", "metrics", "get-series", "7", "queue_time", "--from", "A")
 	if res.code != 2 || !strings.Contains(res.stderr, "missing required flag --to") {
 		t.Errorf("%+v", res)
 	}
@@ -57,13 +57,13 @@ func TestOperationAllPages(t *testing.T) {
 		w.Write([]byte(`{"scale_events":[{"id":2}]}`))
 	})
 
-	res := run(t, srv, nil, "", "list-process-scale-events", "1", "--all")
+	res := run(t, srv, nil, "", "scale-events", "list", "1", "--all")
 	if res.code != 0 || strings.Join(strings.Fields(res.stdout), "") != `{"scale_events":[{"id":1},{"id":2}]}` {
 		t.Errorf("%+v", res)
 	}
 	// --all exists only on paginated operations.
-	if res := run(t, srv, nil, "", "list-apps", "--all"); res.code != 2 {
-		t.Errorf("list-apps --all: %+v", res)
+	if res := run(t, srv, nil, "", "apps", "list", "--all"); res.code != 2 {
+		t.Errorf("apps list --all: %+v", res)
 	}
 }
 
@@ -77,7 +77,7 @@ func TestOperationBodyFromFlags(t *testing.T) {
 		w.Write([]byte(`{}`))
 	})
 
-	res := run(t, srv, nil, "", "update-process", "7", "--max_scale", "10", "--autoscaling_enabled",
+	res := run(t, srv, nil, "", "processes", "update", "7", "--max_scale", "10", "--autoscaling_enabled",
 		"--sniping_enabled=false", "--schedule_time_zone", "UTC", "--autoscale_metrics", `["queue_time"]`)
 	if res.code != 0 {
 		t.Errorf("%+v", res)
@@ -93,19 +93,19 @@ func TestOperationBodyFromData(t *testing.T) {
 		w.Write([]byte(`{}`))
 	})
 
-	if res := run(t, srv, nil, "", "create-api-token", "-d", `{"label":"ci"}`); res.code != 0 {
+	if res := run(t, srv, nil, "", "api-tokens", "create", "-d", `{"label":"ci"}`); res.code != 0 {
 		t.Errorf("--data: %+v", res)
 	}
-	if res := run(t, srv, nil, `{"label":"ci"}`, "create-api-token", "--data", "-"); res.code != 0 {
+	if res := run(t, srv, nil, `{"label":"ci"}`, "api-tokens", "create", "--data", "-"); res.code != 0 {
 		t.Errorf("--data -: %+v", res)
 	}
 }
 
 func TestOperationBodyErrors(t *testing.T) {
 	cases := [][]string{
-		{"update-process", "7", "--max_scale", "ten"},
-		{"update-process", "7", "--autoscale_metrics", "queue_time"},
-		{"update-process", "7", "--max_scale", "1", "--data", "{}"},
+		{"processes", "update", "7", "--max_scale", "ten"},
+		{"processes", "update", "7", "--autoscale_metrics", "queue_time"},
+		{"processes", "update", "7", "--max_scale", "1", "--data", "{}"},
 	}
 	for _, args := range cases {
 		if res := run(t, nil, nil, "", args...); res.code != 2 {
@@ -123,7 +123,7 @@ func TestOperationWithoutBody(t *testing.T) {
 		w.Write([]byte(`{}`))
 	})
 
-	if res := run(t, srv, nil, "", "enable-app-maintenance", "3"); res.code != 0 {
+	if res := run(t, srv, nil, "", "maintenance", "enable", "3"); res.code != 0 {
 		t.Errorf("%+v", res)
 	}
 }
@@ -138,40 +138,40 @@ func TestDeleteNeedsYes(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	res := run(t, srv, nil, "", "delete-app", "1")
+	res := run(t, srv, nil, "", "apps", "delete", "1")
 	if res.code != 2 || !strings.Contains(res.stderr, "pass --yes") || calls != 0 {
 		t.Errorf("without --yes: %+v (calls %d)", res, calls)
 	}
-	if res := run(t, srv, nil, "", "delete-app", "1", "--yes"); res.code != 0 || calls != 1 {
+	if res := run(t, srv, nil, "", "apps", "delete", "1", "--yes"); res.code != 0 || calls != 1 {
 		t.Errorf("with --yes: %+v (calls %d)", res, calls)
 	}
-	if res := run(t, srv, nil, "", "disable-app-maintenance", "1"); res.code != 0 || calls != 2 {
-		t.Errorf("disable-app-maintenance: %+v (calls %d)", res, calls)
+	if res := run(t, srv, nil, "", "maintenance", "disable", "1"); res.code != 0 || calls != 2 {
+		t.Errorf("maintenance disable: %+v (calls %d)", res, calls)
 	}
-	if res := run(t, nil, nil, "", "delete-app", "--help"); !strings.Contains(res.stdout, "--yes") {
+	if res := run(t, nil, nil, "", "apps", "delete", "--help"); !strings.Contains(res.stdout, "--yes") {
 		t.Errorf("help: %s", res.stdout)
 	}
 }
 
 func TestWriteOperationHelp(t *testing.T) {
-	res := run(t, nil, nil, "", "update-process", "--help")
+	res := run(t, nil, nil, "", "processes", "update", "--help")
 	for _, want := range []string{"--max_scale int", "--autoscaling_enabled  ", "--queue_names json", "--schedule_time_zone string", "-d, --data string", "--name=false"} {
 		if !strings.Contains(res.stdout, want) {
 			t.Errorf("help missing %q:\n%s", want, res.stdout)
 		}
 	}
-	help := run(t, nil, nil, "")
-	if !strings.Contains(help.stdout, "update-process") || !strings.Contains(help.stdout, "delete-app") {
-		t.Errorf("root help missing write commands:\n%s", help.stdout)
+	group := run(t, nil, nil, "", "apps")
+	if !strings.Contains(group.stdout, "  update ") || !strings.Contains(group.stdout, "  delete ") {
+		t.Errorf("apps help missing write commands:\n%s", group.stdout)
 	}
 }
 
 func TestOperationHelp(t *testing.T) {
-	res := run(t, nil, nil, "", "list-process-scale-events", "--help")
+	res := run(t, nil, nil, "", "scale-events", "list", "--help")
 	if res.code != 0 {
 		t.Fatalf("%+v", res)
 	}
-	for _, want := range []string{"Usage: judo list-process-scale-events <process_id> [flags]", "--cursor", "--from", "--all"} {
+	for _, want := range []string{"Usage: judo scale-events list <process_id> [flags]", "--cursor", "--from", "--all"} {
 		if !strings.Contains(res.stdout, want) {
 			t.Errorf("help missing %q:\n%s", want, res.stdout)
 		}
@@ -179,7 +179,7 @@ func TestOperationHelp(t *testing.T) {
 }
 
 func TestOperationHelpListsNestedFields(t *testing.T) {
-	res := run(t, nil, nil, "", "update-process-schedule", "--help")
+	res := run(t, nil, nil, "", "schedule", "update", "--help")
 	for _, want := range []string{"--entries json", "wday int", "time string", "min_scale int"} {
 		if !strings.Contains(res.stdout, want) {
 			t.Errorf("help missing %q:\n%s", want, res.stdout)
@@ -193,24 +193,34 @@ func TestKebab(t *testing.T) {
 	}
 }
 
-func TestHelpGroupsCommandsByTag(t *testing.T) {
+func TestRootHelpListsResources(t *testing.T) {
 	help := run(t, nil, nil, "").stdout
-	order := []string{"General:", "Team:", "Apps:", "Processes:", "Process Metrics:", "list-process-metrics"}
 	last := -1
-	for _, want := range order {
+	for _, want := range []string{"General:", "Resources:", "  team ", "  apps ", "  processes ", "  metrics ", "  schedule "} {
 		i := strings.Index(help, want)
 		if i < 0 || i < last {
 			t.Fatalf("%q out of order or missing in:\n%s", want, help)
 		}
 		last = i
 	}
-	apps, procs := strings.Index(help, "Apps:"), strings.Index(help, "Processes:")
-	if i := strings.Index(help, "list-apps"); i < apps || i > procs {
-		t.Error("list-apps is not under Apps")
+	if strings.Contains(help, "list-apps") || strings.Contains(help, "get-series") {
+		t.Errorf("root help lists commands:\n%s", help)
 	}
 }
 
-func TestHelpGroupOrder(t *testing.T) {
+func TestGroupHelp(t *testing.T) {
+	for _, args := range [][]string{{"schedule"}, {"schedule", "--help"}, {"schedule", "help"}} {
+		res := run(t, nil, nil, "", args...)
+		if res.code != 0 || !strings.Contains(res.stdout, "Usage: judo schedule <command>") || !strings.Contains(res.stdout, "  update ") {
+			t.Errorf("%v: %+v", args, res)
+		}
+	}
+	if res := run(t, nil, nil, "", "schedule", "nope"); res.code != 2 || !strings.Contains(res.stderr, `unknown command "schedule nope"`) {
+		t.Errorf("unknown: %+v", res)
+	}
+}
+
+func TestResourceOrder(t *testing.T) {
 	const cached = `{"tags":[{"name":"B"},{"name":"A"}],"paths":{
 		"/1":{"get":{"operationId":"getA","summary":"a","tags":["A"]}},
 		"/2":{"get":{"operationId":"getB","summary":"b","tags":["B"]}},
@@ -224,8 +234,8 @@ func TestHelpGroupOrder(t *testing.T) {
 	help := runIn(t, dir, nil, nil, "").stdout
 	last := -1
 	// Declared tags in spec order, undeclared alphabetically, untagged last.
-	for _, want := range []string{"B:", "A:", "Y:", "Z:", "Other:"} {
-		i := strings.Index(help, "\n"+want)
+	for _, want := range []string{"\n  b ", "\n  a ", "\n  y ", "\n  z ", "\n  other "} {
+		i := strings.Index(help, want)
 		if i < 0 || i < last {
 			t.Fatalf("%q out of order or missing in:\n%s", want, help)
 		}

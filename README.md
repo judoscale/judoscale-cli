@@ -21,23 +21,24 @@ export JUDOSCALE_API_TOKEN=jdo_...
 ```
 
 ```sh
-judo help                      # list commands
-judo list-apps
-judo list-app-processes 123
-judo get-process-metric-series 456 queue_time --from 2026-01-01T00:00:00Z --to 2026-01-02T00:00:00Z
-judo list-process-scale-events 456 --all   # follow next_cursor, merge all pages
-judo update-process 456 --max_scale 10 --autoscaling_enabled
-judo update-process 456 --queue_names '["default","mailers"]'
-judo create-api-token --data '{"label":"ci","read_only":true}'
+judo help                      # list resources
+judo apps                      # list the commands for apps
+judo apps list
+judo processes list 123
+judo metrics get-series 456 queue_time --from 2026-01-01T00:00:00Z --to 2026-01-02T00:00:00Z
+judo scale-events list 456 --all   # follow next_cursor, merge all pages
+judo processes update 456 --max_scale 10 --autoscaling_enabled
+judo processes update 456 --queue_names '["default","mailers"]'
+judo api-tokens create --data '{"label":"ci","read_only":true}'
 judo api GET /v1/team          # raw request
 judo update                    # refresh the API spec
 ```
 
-Commands are built from the Judoscale API's OpenAPI spec. Run `judo help` to list them and `judo <command> --help` for details.
+Commands are built from the Judoscale API's OpenAPI spec. They are grouped by resource: run `judo help` to list the resources, `judo <resource>` to list its commands, and `judo <resource> <command> --help` for details.
 
 Request body fields are flags. Boolean flags are set with `--name` or `--name=false`, and array or object fields take a JSON value. Pass `-d`/`--data` to send a whole JSON body instead (`--data -` reads it from stdin).
 
-Destructive commands, like `judo delete-app 123`, refuse to run without `--yes`. `judo api` never asks.
+Destructive commands, like `judo apps delete 123`, refuse to run without `--yes`. `judo api` never asks.
 
 ### Environment
 

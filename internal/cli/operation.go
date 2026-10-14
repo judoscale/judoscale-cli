@@ -18,8 +18,9 @@ import (
 
 // runOperation runs a command built from a spec operation. Path parameters are
 // positional (in path order); query parameters and body fields are flags.
-func (a *App) runOperation(ctx context.Context, op spec.Operation, args []string) error {
-	fs := flag.NewFlagSet(commandName(op), flag.ContinueOnError)
+func (a *App) runOperation(ctx context.Context, cmd command, args []string) error {
+	op := cmd.op
+	fs := flag.NewFlagSet(cmd.fullName(), flag.ContinueOnError)
 	query := map[string]*string{}
 	for _, p := range op.QueryParams {
 		query[p.Name] = fs.String(p.Name, "", "")
@@ -52,12 +53,12 @@ func (a *App) runOperation(ctx context.Context, op spec.Operation, args []string
 	pos, err := parseInterleaved(fs, args)
 	if err != nil {
 		if err == flagHelp {
-			a.operationHelp(op, all != nil)
+			a.operationHelp(cmd, all != nil)
 		}
 		return err
 	}
 	if len(pos) != len(op.PathParams) {
-		return usagef("usage: %s", usageLine(op))
+		return usagef("usage: %s", usageLine(cmd))
 	}
 
 	path := op.Path
@@ -69,7 +70,7 @@ func (a *App) runOperation(ctx context.Context, op spec.Operation, args []string
 		v := *query[p.Name]
 		if v == "" {
 			if p.Required {
-				return usagef("missing required flag --%s\nusage: %s", p.Name, usageLine(op))
+				return usagef("missing required flag --%s\nusage: %s", p.Name, usageLine(cmd))
 			}
 			continue
 		}
@@ -77,7 +78,7 @@ func (a *App) runOperation(ctx context.Context, op spec.Operation, args []string
 	}
 
 	if yes != nil && !*yes {
-		return usagef("%s is destructive; pass --yes to confirm", commandName(op))
+		return usagef("%s is destructive; pass --yes to confirm", cmd.fullName())
 	}
 
 	body, err := a.requestBody(op, fs, data, fields)
@@ -177,9 +178,9 @@ func encodeField(p spec.Param, v string) (json.RawMessage, error) {
 	return json.RawMessage(v), nil
 }
 
-func usageLine(op spec.Operation) string {
-	line := "judo " + commandName(op)
-	for _, p := range op.PathParams {
+func usageLine(cmd command) string {
+	line := "judo " + cmd.fullName()
+	for _, p := range cmd.op.PathParams {
 		line += " <" + p.Name + ">"
 	}
 	return line + " [flags]"
@@ -200,9 +201,10 @@ func flagType(t string) string {
 	return " json"
 }
 
-func (a *App) operationHelp(op spec.Operation, paginated bool) {
+func (a *App) operationHelp(cmd command, paginated bool) {
+	op := cmd.op
 	w := a.Stdout
-	fmt.Fprintf(w, "%s\n\nUsage: %s\n", op.Summary, usageLine(op))
+	fmt.Fprintf(w, "%s\n\nUsage: %s\n", op.Summary, usageLine(cmd))
 	if op.Description != "" {
 		fmt.Fprintf(w, "\n%s\n", op.Description)
 	}

@@ -11,7 +11,7 @@ import (
 )
 
 func TestUpdateWritesCacheWhichOverridesSnapshot(t *testing.T) {
-	const newSpec = `{"openapi":"3.2.0","paths":{"/v1/widgets":{"get":{"operationId":"listWidgets","summary":"List widgets"}}}}`
+	const newSpec = `{"openapi":"3.2.0","paths":{"/v1/widgets":{"get":{"operationId":"listWidgets","summary":"List widgets","tags":["Widgets"]}}}}`
 	srv := server(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/openapi.json":
@@ -24,7 +24,7 @@ func TestUpdateWritesCacheWhichOverridesSnapshot(t *testing.T) {
 	})
 	dir := t.TempDir()
 
-	if res := runIn(t, dir, srv, nil, "", "list-widgets"); res.code != 2 {
+	if res := runIn(t, dir, srv, nil, "", "widgets", "list"); res.code != 2 {
 		t.Fatalf("before update: %+v", res)
 	}
 	res := runIn(t, dir, srv, nil, "", "update")
@@ -34,10 +34,10 @@ func TestUpdateWritesCacheWhichOverridesSnapshot(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "judoscale", "openapi.json")); err != nil {
 		t.Fatal(err)
 	}
-	if res := runIn(t, dir, srv, nil, "", "list-widgets"); res.code != 0 {
+	if res := runIn(t, dir, srv, nil, "", "widgets", "list"); res.code != 0 {
 		t.Errorf("after update: %+v", res)
 	}
-	if res := runIn(t, dir, srv, nil, "", "list-apps"); res.code != 2 {
+	if res := runIn(t, dir, srv, nil, "", "apps", "list"); res.code != 2 {
 		t.Errorf("cache should replace snapshot: %+v", res)
 	}
 }

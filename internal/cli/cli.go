@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"slices"
-	"sort"
 	"strings"
 	"time"
 
@@ -73,10 +71,18 @@ func (a *App) run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	if op := findCommand(s, name); op != nil {
-		return a.runOperation(ctx, *op, rest)
+	g := findGroup(commandTree(s), name)
+	if g == nil {
+		return usagef("unknown command %q; run `judo help` to list commands", name)
 	}
-	return usagef("unknown command %q; run `judo help` to list commands", name)
+	if len(rest) == 0 || rest[0] == "help" || rest[0] == "-h" || rest[0] == "--help" {
+		a.groupHelp(g)
+		return nil
+	}
+	if c := g.find(rest[0]); c != nil {
+		return a.runOperation(ctx, *c, rest[1:])
+	}
+	return usagef("unknown command %q; run `judo %s` to list its commands", name+" "+rest[0], name)
 }
 
 func (a *App) specDir() string {
@@ -133,83 +139,70 @@ func (a *App) rootHelp() error {
 	w := a.Stdout
 	fmt.Fprint(w, `judo: command line client for Judoscale
 
-Usage: judo <command> [arguments] [flags]
+Usage: judo <resource> <command> [arguments] [flags]
 
 Environment:
   JUDOSCALE_API_TOKEN  API token (required for API commands)
   JUDOSCALE_API_URL    API base URL (default https://api.judoscale.com)
 `)
 
-	groups := []helpGroup{{"General", []helpEntry{
+	general := []helpEntry{
 		{"api", "Make a raw API request: api <METHOD> <path>"},
 		{"update", "Download the latest API spec and refresh the list of available commands"},
 		{"version", "Print the CLI version"},
-	}}}
+	}
+	var resources []helpEntry
 	if s, err := a.loadSpec(); err == nil {
-		groups = append(groups, groupByTag(s)...)
-	}
-
-	width := 0
-	for _, g := range groups {
-		for _, e := range g.entries {
-			width = max(width, len(e.name))
+		for _, g := range commandTree(s) {
+			resources = append(resources, helpEntry{g.name, firstSentence(g.description)})
 		}
 	}
-	for _, g := range groups {
-		fmt.Fprintf(w, "\n%s:\n", g.title)
-		for _, e := range g.entries {
-			fmt.Fprintf(w, "  %-*s  %s\n", width, e.name, e.summary)
-		}
+	printEntries(w, "General", general, resources)
+	if len(resources) > 0 {
+		printEntries(w, "Resources", resources, general)
 	}
-	fmt.Fprintln(w, "\nRun `judo <command> --help` for details.")
+	fmt.Fprintln(w, "\nRun `judo <resource>` to list its commands, and `judo <resource> <command> --help` for details.")
 	return nil
+}
+
+func (a *App) groupHelp(g *group) {
+	w := a.Stdout
+	if g.description != "" {
+		fmt.Fprintf(w, "%s\n\n", strings.TrimSpace(g.description))
+	}
+	fmt.Fprintf(w, "Usage: judo %s <command> [arguments] [flags]\n", g.name)
+	var entries []helpEntry
+	for _, c := range g.commands {
+		entries = append(entries, helpEntry{c.name, c.op.Summary})
+	}
+	printEntries(w, "Commands", entries)
+	fmt.Fprintf(w, "\nRun `judo %s <command> --help` for details.\n", g.name)
 }
 
 type helpEntry struct{ name, summary string }
 
-type helpGroup struct {
-	title   string
-	entries []helpEntry
+// printEntries prints a titled list, aligned with the other lists given.
+func printEntries(w io.Writer, title string, entries []helpEntry, alignWith ...[]helpEntry) {
+	width := 0
+	for _, list := range append(alignWith, entries) {
+		for _, e := range list {
+			width = max(width, len(e.name))
+		}
+	}
+	fmt.Fprintf(w, "\n%s:\n", title)
+	for _, e := range entries {
+		fmt.Fprintf(w, "  %-*s  %s\n", width, e.name, e.summary)
+	}
 }
 
-// groupByTag sections the commands by operation tag, in the spec's tag order.
-// Tags the spec doesn't declare follow alphabetically, then untagged commands.
-func groupByTag(s *spec.Spec) []helpGroup {
-	byTag := map[string][]helpEntry{}
-	for _, op := range commandOps(s) {
-		byTag[op.Tag] = append(byTag[op.Tag], helpEntry{commandName(op), op.Summary})
+// firstSentence shortens a description to its first sentence, on one line.
+func firstSentence(s string) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if i := strings.Index(s, ". "); i >= 0 {
+		return s[:i+1]
 	}
-
-	var order []string
-	for _, tag := range s.Tags {
-		if t := tag.Name; byTag[t] != nil && t != "" {
-			order = append(order, t)
-		}
-	}
-	var rest []string
-	for t := range byTag {
-		if t != "" && !slices.Contains(order, t) {
-			rest = append(rest, t)
-		}
-	}
-	sort.Strings(rest)
-	order = append(order, rest...)
-	if _, ok := byTag[""]; ok {
-		order = append(order, "")
-	}
-
-	groups := make([]helpGroup, 0, len(order))
-	for _, t := range order {
-		title := t
-		if title == "" {
-			title = "Other"
-		}
-		groups = append(groups, helpGroup{title, byTag[t]})
-	}
-	return groups
+	return s
 }
-
-func commandName(op spec.Operation) string { return kebab(op.ID) }
 
 // kebab converts an operationId like getProcessMetricSeries to get-process-metric-series.
 func kebab(id string) string {
@@ -224,20 +217,4 @@ func kebab(id string) string {
 		b.WriteRune(r)
 	}
 	return b.String()
-}
-
-// commandOps returns the operations exposed as commands, sorted by name.
-func commandOps(s *spec.Spec) []spec.Operation {
-	ops := slices.Clone(s.Operations)
-	sort.Slice(ops, func(i, j int) bool { return commandName(ops[i]) < commandName(ops[j]) })
-	return ops
-}
-
-func findCommand(s *spec.Spec, name string) *spec.Operation {
-	for _, op := range commandOps(s) {
-		if commandName(op) == name {
-			return &op
-		}
-	}
-	return nil
 }
