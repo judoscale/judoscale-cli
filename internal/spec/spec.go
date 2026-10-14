@@ -57,6 +57,8 @@ type Param struct {
 	// Fields are the properties of an object, or of an array's object items.
 	// Only one level deep, for help output.
 	Fields []Param
+	// Enum lists the allowed values, if the schema restricts them.
+	Enum []string
 }
 
 type rawParam struct {
@@ -67,6 +69,7 @@ type rawParam struct {
 	Required    bool   `json:"required"`
 	Schema      struct {
 		Type schemaType `json:"type"`
+		Enum []any      `json:"enum"`
 	} `json:"schema"`
 }
 
@@ -77,6 +80,7 @@ type rawSchema struct {
 	Properties  map[string]rawSchema `json:"properties"`
 	Required    []string             `json:"required"`
 	Items       *rawSchema           `json:"items"`
+	Enum        []any                `json:"enum"`
 }
 
 // schemaType is a JSON schema type, which may be a list such as
@@ -192,18 +196,28 @@ func buildOperation(op rawOperation, method, path string, shared []rawParam, raw
 
 	for _, m := range pathVar.FindAllStringSubmatch(path, -1) {
 		p := byKey["path:"+m[1]]
-		o.PathParams = append(o.PathParams, Param{Name: m[1], Description: p.Description, Required: true, Type: string(p.Schema.Type)})
+		o.PathParams = append(o.PathParams, Param{Name: m[1], Description: p.Description, Required: true, Type: string(p.Schema.Type), Enum: enum(p.Schema.Enum)})
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
 		if p := byKey[k]; p.In == "query" {
-			o.QueryParams = append(o.QueryParams, Param{Name: p.Name, Description: p.Description, Required: p.Required, Type: string(p.Schema.Type)})
+			o.QueryParams = append(o.QueryParams, Param{Name: p.Name, Description: p.Description, Required: p.Required, Type: string(p.Schema.Type), Enum: enum(p.Schema.Enum)})
 		}
 	}
 
 	body := op.RequestBody.Content["application/json"].Schema
 	o.BodyParams = properties(body, raw.Components.Schemas, true)
 	return o
+}
+
+func enum(values []any) []string {
+	var out []string
+	for _, v := range values {
+		if v != nil {
+			out = append(out, fmt.Sprint(v))
+		}
+	}
+	return out
 }
 
 // resolve follows a $ref to components/schemas, keeping a description set
@@ -235,7 +249,7 @@ func properties(s rawSchema, schemas map[string]rawSchema, nested bool) []Param 
 		if desc == "" {
 			desc = item.Description
 		}
-		p := Param{Name: name, Description: desc, Required: slices.Contains(s.Required, name), Type: string(prop.Type)}
+		p := Param{Name: name, Description: desc, Required: slices.Contains(s.Required, name), Type: string(prop.Type), Enum: enum(item.Enum)}
 		if nested {
 			p.Fields = properties(item, schemas, false)
 		}

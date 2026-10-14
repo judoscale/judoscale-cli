@@ -187,6 +187,13 @@ func TestOperationHelpListsNestedFields(t *testing.T) {
 	}
 }
 
+func TestOperationHelpListsEnumValues(t *testing.T) {
+	res := run(t, nil, nil, "", "memberships", "update", "--help")
+	if !strings.Contains(res.stdout, "(one of: member, admin)") {
+		t.Errorf("help:\n%s", res.stdout)
+	}
+}
+
 func TestKebab(t *testing.T) {
 	if got := kebab("getProcessMetricSeriesPerInstance"); got != "get-process-metric-series-per-instance" {
 		t.Errorf("kebab = %q", got)

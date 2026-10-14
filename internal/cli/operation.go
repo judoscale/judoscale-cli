@@ -214,7 +214,10 @@ func (a *App) operationHelp(cmd command, paginated bool) {
 	fmt.Fprint(w, "\nFlags:\n")
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	describe := func(p spec.Param) string {
-		desc := firstLine(strings.TrimSpace(p.Description))
+		desc := strings.TrimSuffix(firstLine(strings.TrimSpace(p.Description)), ":")
+		if len(p.Enum) > 0 {
+			desc += " (one of: " + strings.Join(p.Enum, ", ") + ")"
+		}
 		if p.Required {
 			desc += " (required)"
 		}

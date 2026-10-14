@@ -71,7 +71,8 @@ func TestParseRequestBody(t *testing.T) {
 	    "owner":{"type":"object","properties":{"email":{"type":"string"}},"required":["email"]},
 	    "entries":{"type":"array","items":{"type":"object","properties":{"day":{"type":"integer"},"at":{"type":"string"}}}},
 	    "metrics":{"type":"array","items":{"$ref":"#/components/schemas/Metric"}},
-	    "main":{"$ref":"#/components/schemas/Metric","description":"the main one"}
+	    "main":{"$ref":"#/components/schemas/Metric","description":"the main one"},
+	    "role":{"type":"string","enum":["member","admin"]}
 	  },
 	  "required":["name"]
 	}}}}}}},
@@ -87,6 +88,7 @@ func TestParseRequestBody(t *testing.T) {
 		{Name: "metrics", Description: "A metric.", Type: "array", Fields: []Param{{Name: "name", Type: "string"}}},
 		{Name: "name", Description: "the name", Required: true, Type: "string"},
 		{Name: "owner", Type: "object", Fields: []Param{{Name: "email", Required: true, Type: "string"}}},
+		{Name: "role", Type: "string", Enum: []string{"member", "admin"}},
 		{Name: "tags", Type: "array"},
 	}
 	if got := s.Operations[0].BodyParams; !reflect.DeepEqual(got, want) {
