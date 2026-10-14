@@ -212,7 +212,7 @@ func Load(configDir, cliVersion string) (s *Spec, warning string, err error) {
 			if parseErr == nil {
 				return cached, "", nil
 			}
-			warning = fmt.Sprintf("ignoring cached spec (%v); using the built-in spec. Run `judoscale update` to refresh it.", parseErr)
+			warning = fmt.Sprintf("ignoring cached spec (%v); using the built-in spec. Run `judo update` to refresh it.", parseErr)
 		case !errors.Is(readErr, os.ErrNotExist):
 			warning = fmt.Sprintf("ignoring cached spec (%v); using the built-in spec.", readErr)
 		}
