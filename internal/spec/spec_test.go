@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -21,7 +22,7 @@ const miniSpec = `{
         "operationId": "getThingPart", "summary": "Get a part", "tags": ["Parts", "Things"],
         "parameters": [
           {"name": "part", "in": "path", "required": true},
-          {"name": "to", "in": "query", "required": true, "description": "end"},
+          {"name": "to", "in": "query", "required": true, "description": "end", "schema": {"type": "string"}},
           {"$ref": "#/components/parameters/From"}
         ]
       },
@@ -55,8 +56,28 @@ func TestParse(t *testing.T) {
 	if len(op.PathParams) != 2 || op.PathParams[0].Name != "id" || op.PathParams[1].Name != "part" {
 		t.Errorf("path params = %+v", op.PathParams)
 	}
-	if len(op.QueryParams) != 2 || op.QueryParams[0] != (Param{"from", "start", false}) || op.QueryParams[1] != (Param{"to", "end", true}) {
+	if len(op.QueryParams) != 2 || op.QueryParams[0] != (Param{Name: "from", Description: "start"}) || op.QueryParams[1] != (Param{Name: "to", Description: "end", Required: true, Type: "string"}) {
 		t.Errorf("query params = %+v", op.QueryParams)
+	}
+}
+
+func TestParseRequestBody(t *testing.T) {
+	data := `{"paths":{"/a":{"patch":{"operationId":"updateA","requestBody":{"content":{"application/json":{"schema":{
+	  "type":"object",
+	  "properties":{"name":{"type":"string","description":"the name"},"count":{"type":"integer"},"tags":{"type":"array"}},
+	  "required":["name"]
+	}}}}}}}}`
+	s, err := Parse([]byte(data), "dev")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Param{
+		{Name: "count", Type: "integer"},
+		{Name: "name", Description: "the name", Required: true, Type: "string"},
+		{Name: "tags", Type: "array"},
+	}
+	if got := s.Operations[0].BodyParams; !slices.Equal(got, want) {
+		t.Errorf("body params = %+v", got)
 	}
 }
 

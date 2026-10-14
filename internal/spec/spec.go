@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -39,12 +40,15 @@ type Operation struct {
 	// PathParams are in the order they appear in Path.
 	PathParams  []Param
 	QueryParams []Param
+	// BodyParams are the top-level properties of the JSON request body.
+	BodyParams []Param
 }
 
 type Param struct {
 	Name        string
 	Description string
 	Required    bool
+	Type        string // JSON schema type, e.g. string, integer, boolean, array
 }
 
 type rawParam struct {
@@ -53,6 +57,17 @@ type rawParam struct {
 	In          string `json:"in"`
 	Description string `json:"description"`
 	Required    bool   `json:"required"`
+	Schema      struct {
+		Type string `json:"type"`
+	} `json:"schema"`
+}
+
+type rawSchema struct {
+	Properties map[string]struct {
+		Type        string `json:"type"`
+		Description string `json:"description"`
+	} `json:"properties"`
+	Required []string `json:"required"`
 }
 
 type rawOperation struct {
@@ -61,6 +76,11 @@ type rawOperation struct {
 	Summary     string     `json:"summary"`
 	Description string     `json:"description"`
 	Parameters  []rawParam `json:"parameters"`
+	RequestBody struct {
+		Content map[string]struct {
+			Schema rawSchema `json:"schema"`
+		} `json:"content"`
+	} `json:"requestBody"`
 }
 
 type rawSpec struct {
@@ -144,14 +164,21 @@ func buildOperation(op rawOperation, method, path string, shared []rawParam, raw
 
 	for _, m := range pathVar.FindAllStringSubmatch(path, -1) {
 		p := byKey["path:"+m[1]]
-		o.PathParams = append(o.PathParams, Param{Name: m[1], Description: p.Description, Required: true})
+		o.PathParams = append(o.PathParams, Param{Name: m[1], Description: p.Description, Required: true, Type: p.Schema.Type})
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
 		if p := byKey[k]; p.In == "query" {
-			o.QueryParams = append(o.QueryParams, Param{Name: p.Name, Description: p.Description, Required: p.Required})
+			o.QueryParams = append(o.QueryParams, Param{Name: p.Name, Description: p.Description, Required: p.Required, Type: p.Schema.Type})
 		}
 	}
+
+	body := op.RequestBody.Content["application/json"].Schema
+	for name, prop := range body.Properties {
+		required := slices.Contains(body.Required, name)
+		o.BodyParams = append(o.BodyParams, Param{Name: name, Description: prop.Description, Required: required, Type: prop.Type})
+	}
+	sort.Slice(o.BodyParams, func(i, j int) bool { return o.BodyParams[i].Name < o.BodyParams[j].Name })
 	return o
 }
 
