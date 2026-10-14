@@ -37,6 +37,8 @@ Commands are built from the Judoscale API's OpenAPI spec. Run `judo help` to lis
 
 Request body fields are flags. Boolean flags are set with `--name` or `--name=false`, and array or object fields take a JSON value. Pass `-d`/`--data` to send a whole JSON body instead (`--data -` reads it from stdin).
 
+Destructive commands, like `judo delete-app 123`, refuse to run without `--yes`. `judo api` never asks.
+
 ### Environment
 
 | Variable              | Description                                        |

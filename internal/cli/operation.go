@@ -28,6 +28,10 @@ func (a *App) runOperation(ctx context.Context, op spec.Operation, args []string
 	if _, paginated := query["cursor"]; paginated {
 		all = fs.Bool("all", false, "")
 	}
+	var yes *bool
+	if destructive(op) {
+		yes = fs.Bool("yes", false, "")
+	}
 	var data *string
 	if hasBody(op) {
 		data = fs.String("data", "", "")
@@ -72,6 +76,10 @@ func (a *App) runOperation(ctx context.Context, op spec.Operation, args []string
 		q.Set(p.Name, v)
 	}
 
+	if yes != nil && !*yes {
+		return usagef("%s is destructive; pass --yes to confirm", commandName(op))
+	}
+
 	body, err := a.requestBody(op, fs, data, fields)
 	if err != nil {
 		return err
@@ -91,6 +99,16 @@ func (a *App) runOperation(ctx context.Context, op spec.Operation, args []string
 		return err
 	}
 	return a.printJSON(resp)
+}
+
+// notDestructive lists DELETE operations that don't need --yes.
+var notDestructive = map[string]bool{
+	"disableAppMaintenance": true,
+}
+
+// destructive reports whether op needs --yes to run.
+func destructive(op spec.Operation) bool {
+	return op.Method == http.MethodDelete && !notDestructive[op.ID]
 }
 
 func hasBody(op spec.Operation) bool {
@@ -188,7 +206,7 @@ func (a *App) operationHelp(op spec.Operation, paginated bool) {
 	if op.Description != "" {
 		fmt.Fprintf(w, "\n%s\n", op.Description)
 	}
-	if len(op.QueryParams) == 0 && len(op.BodyParams) == 0 && !paginated && !hasBody(op) {
+	if len(op.QueryParams) == 0 && len(op.BodyParams) == 0 && !paginated && !hasBody(op) && !destructive(op) {
 		return
 	}
 	fmt.Fprint(w, "\nFlags:\n")
@@ -215,6 +233,9 @@ func (a *App) operationHelp(op spec.Operation, paginated bool) {
 	}
 	if hasBody(op) {
 		fmt.Fprintln(tw, "  -d, --data string\tJSON request body instead of field flags; use - to read it from stdin")
+	}
+	if destructive(op) {
+		fmt.Fprintln(tw, "  --yes\tConfirm this destructive action (required)")
 	}
 	if paginated {
 		fmt.Fprintln(tw, "  --all\tFollow next_cursor and merge all pages")

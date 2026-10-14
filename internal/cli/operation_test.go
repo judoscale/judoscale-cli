@@ -128,6 +128,31 @@ func TestOperationWithoutBody(t *testing.T) {
 	}
 }
 
+func TestDeleteNeedsYes(t *testing.T) {
+	var calls int
+	srv := server(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.Method != "DELETE" {
+			t.Errorf("method = %s", r.Method)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	res := run(t, srv, nil, "", "delete-app", "1")
+	if res.code != 2 || !strings.Contains(res.stderr, "pass --yes") || calls != 0 {
+		t.Errorf("without --yes: %+v (calls %d)", res, calls)
+	}
+	if res := run(t, srv, nil, "", "delete-app", "1", "--yes"); res.code != 0 || calls != 1 {
+		t.Errorf("with --yes: %+v (calls %d)", res, calls)
+	}
+	if res := run(t, srv, nil, "", "disable-app-maintenance", "1"); res.code != 0 || calls != 2 {
+		t.Errorf("disable-app-maintenance: %+v (calls %d)", res, calls)
+	}
+	if res := run(t, nil, nil, "", "delete-app", "--help"); !strings.Contains(res.stdout, "--yes") {
+		t.Errorf("help: %s", res.stdout)
+	}
+}
+
 func TestWriteOperationHelp(t *testing.T) {
 	res := run(t, nil, nil, "", "update-process", "--help")
 	for _, want := range []string{"--max_scale int", "--autoscaling_enabled  ", "--queue_names json", "--schedule_time_zone string", "-d, --data string", "--name=false"} {
