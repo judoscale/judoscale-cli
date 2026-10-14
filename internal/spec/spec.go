@@ -66,16 +66,39 @@ type rawParam struct {
 	Description string `json:"description"`
 	Required    bool   `json:"required"`
 	Schema      struct {
-		Type string `json:"type"`
+		Type schemaType `json:"type"`
 	} `json:"schema"`
 }
 
 type rawSchema struct {
-	Type        string               `json:"type"`
+	Ref         string               `json:"$ref"`
+	Type        schemaType           `json:"type"`
 	Description string               `json:"description"`
 	Properties  map[string]rawSchema `json:"properties"`
 	Required    []string             `json:"required"`
 	Items       *rawSchema           `json:"items"`
+}
+
+// schemaType is a JSON schema type, which may be a list such as
+// ["string", "null"]; it keeps the first type that isn't null.
+type schemaType string
+
+func (t *schemaType) UnmarshalJSON(b []byte) error {
+	var types []string
+	if err := json.Unmarshal(b, &types); err != nil {
+		var one string
+		if err := json.Unmarshal(b, &one); err != nil {
+			return err
+		}
+		types = []string{one}
+	}
+	for _, typ := range types {
+		if typ != "null" {
+			*t = schemaType(typ)
+			return nil
+		}
+	}
+	return nil
 }
 
 type rawOperation struct {
@@ -96,7 +119,8 @@ type rawSpec struct {
 	Paths         map[string]map[string]json.RawMessage
 	Tags          []Tag `json:"tags"`
 	Components    struct {
-		Parameters map[string]rawParam `json:"parameters"`
+		Parameters map[string]rawParam  `json:"parameters"`
+		Schemas    map[string]rawSchema `json:"schemas"`
 	} `json:"components"`
 }
 
@@ -168,32 +192,52 @@ func buildOperation(op rawOperation, method, path string, shared []rawParam, raw
 
 	for _, m := range pathVar.FindAllStringSubmatch(path, -1) {
 		p := byKey["path:"+m[1]]
-		o.PathParams = append(o.PathParams, Param{Name: m[1], Description: p.Description, Required: true, Type: p.Schema.Type})
+		o.PathParams = append(o.PathParams, Param{Name: m[1], Description: p.Description, Required: true, Type: string(p.Schema.Type)})
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
 		if p := byKey[k]; p.In == "query" {
-			o.QueryParams = append(o.QueryParams, Param{Name: p.Name, Description: p.Description, Required: p.Required, Type: p.Schema.Type})
+			o.QueryParams = append(o.QueryParams, Param{Name: p.Name, Description: p.Description, Required: p.Required, Type: string(p.Schema.Type)})
 		}
 	}
 
 	body := op.RequestBody.Content["application/json"].Schema
-	o.BodyParams = properties(body, true)
+	o.BodyParams = properties(body, raw.Components.Schemas, true)
 	return o
 }
 
+// resolve follows a $ref to components/schemas, keeping a description set
+// next to the $ref.
+func resolve(s rawSchema, schemas map[string]rawSchema) rawSchema {
+	name, ok := strings.CutPrefix(s.Ref, "#/components/schemas/")
+	if !ok {
+		return s
+	}
+	r := schemas[name]
+	if s.Description != "" {
+		r.Description = s.Description
+	}
+	return r
+}
+
 // properties returns a schema's properties sorted by name, with the fields of
-// object (or array of object) properties when nested is set.
-func properties(s rawSchema, nested bool) []Param {
+// object (or array of object) properties when nested is set. A property without
+// a description takes the one from the schema it refers to.
+func properties(s rawSchema, schemas map[string]rawSchema, nested bool) []Param {
 	var params []Param
 	for name, prop := range s.Properties {
-		p := Param{Name: name, Description: prop.Description, Required: slices.Contains(s.Required, name), Type: prop.Type}
+		prop = resolve(prop, schemas)
+		item := prop
+		if prop.Type == "array" && prop.Items != nil {
+			item = resolve(*prop.Items, schemas)
+		}
+		desc := prop.Description
+		if desc == "" {
+			desc = item.Description
+		}
+		p := Param{Name: name, Description: desc, Required: slices.Contains(s.Required, name), Type: string(prop.Type)}
 		if nested {
-			if prop.Type == "array" && prop.Items != nil {
-				p.Fields = properties(*prop.Items, false)
-			} else {
-				p.Fields = properties(prop, false)
-			}
+			p.Fields = properties(item, schemas, false)
 		}
 		params = append(params, p)
 	}

@@ -69,10 +69,13 @@ func TestParseRequestBody(t *testing.T) {
 	    "count":{"type":"integer"},
 	    "tags":{"type":"array","items":{"type":"string"}},
 	    "owner":{"type":"object","properties":{"email":{"type":"string"}},"required":["email"]},
-	    "entries":{"type":"array","items":{"type":"object","properties":{"day":{"type":"integer"},"at":{"type":"string"}}}}
+	    "entries":{"type":"array","items":{"type":"object","properties":{"day":{"type":"integer"},"at":{"type":"string"}}}},
+	    "metrics":{"type":"array","items":{"$ref":"#/components/schemas/Metric"}},
+	    "main":{"$ref":"#/components/schemas/Metric","description":"the main one"}
 	  },
 	  "required":["name"]
-	}}}}}}}}`
+	}}}}}}},
+	"components":{"schemas":{"Metric":{"type":"object","description":"A metric.","properties":{"name":{"type":["null","string"]}}}}}}`
 	s, err := Parse([]byte(data), "dev")
 	if err != nil {
 		t.Fatal(err)
@@ -80,6 +83,8 @@ func TestParseRequestBody(t *testing.T) {
 	want := []Param{
 		{Name: "count", Type: "integer"},
 		{Name: "entries", Type: "array", Fields: []Param{{Name: "at", Type: "string"}, {Name: "day", Type: "integer"}}},
+		{Name: "main", Description: "the main one", Type: "object", Fields: []Param{{Name: "name", Type: "string"}}},
+		{Name: "metrics", Description: "A metric.", Type: "array", Fields: []Param{{Name: "name", Type: "string"}}},
 		{Name: "name", Description: "the name", Required: true, Type: "string"},
 		{Name: "owner", Type: "object", Fields: []Param{{Name: "email", Required: true, Type: "string"}}},
 		{Name: "tags", Type: "array"},
