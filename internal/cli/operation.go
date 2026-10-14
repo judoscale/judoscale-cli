@@ -205,6 +205,13 @@ func (a *App) operationHelp(op spec.Operation, paginated bool) {
 	}
 	for _, p := range op.BodyParams {
 		fmt.Fprintf(tw, "  --%s%s\t%s\n", p.Name, flagType(p.Type), describe(p))
+		for _, f := range p.Fields {
+			typ := flagType(f.Type)
+			if f.Type == "boolean" {
+				typ = " bool" // JSON values, not flags
+			}
+			fmt.Fprintf(tw, "      %s%s\t%s\n", f.Name, typ, describe(f))
+		}
 	}
 	if hasBody(op) {
 		fmt.Fprintln(tw, "  -d, --data string\tJSON request body instead of field flags; use - to read it from stdin")

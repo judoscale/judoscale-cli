@@ -153,6 +153,15 @@ func TestOperationHelp(t *testing.T) {
 	}
 }
 
+func TestOperationHelpListsNestedFields(t *testing.T) {
+	res := run(t, nil, nil, "", "update-process-schedule", "--help")
+	for _, want := range []string{"--entries json", "wday int", "time string", "min_scale int"} {
+		if !strings.Contains(res.stdout, want) {
+			t.Errorf("help missing %q:\n%s", want, res.stdout)
+		}
+	}
+}
+
 func TestKebab(t *testing.T) {
 	if got := kebab("getProcessMetricSeriesPerInstance"); got != "get-process-metric-series-per-instance" {
 		t.Errorf("kebab = %q", got)

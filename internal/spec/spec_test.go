@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"slices"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -56,7 +56,7 @@ func TestParse(t *testing.T) {
 	if len(op.PathParams) != 2 || op.PathParams[0].Name != "id" || op.PathParams[1].Name != "part" {
 		t.Errorf("path params = %+v", op.PathParams)
 	}
-	if len(op.QueryParams) != 2 || op.QueryParams[0] != (Param{Name: "from", Description: "start"}) || op.QueryParams[1] != (Param{Name: "to", Description: "end", Required: true, Type: "string"}) {
+	if len(op.QueryParams) != 2 || !reflect.DeepEqual(op.QueryParams[0], Param{Name: "from", Description: "start"}) || !reflect.DeepEqual(op.QueryParams[1], Param{Name: "to", Description: "end", Required: true, Type: "string"}) {
 		t.Errorf("query params = %+v", op.QueryParams)
 	}
 }
@@ -64,7 +64,13 @@ func TestParse(t *testing.T) {
 func TestParseRequestBody(t *testing.T) {
 	data := `{"paths":{"/a":{"patch":{"operationId":"updateA","requestBody":{"content":{"application/json":{"schema":{
 	  "type":"object",
-	  "properties":{"name":{"type":"string","description":"the name"},"count":{"type":"integer"},"tags":{"type":"array"}},
+	  "properties":{
+	    "name":{"type":"string","description":"the name"},
+	    "count":{"type":"integer"},
+	    "tags":{"type":"array","items":{"type":"string"}},
+	    "owner":{"type":"object","properties":{"email":{"type":"string"}},"required":["email"]},
+	    "entries":{"type":"array","items":{"type":"object","properties":{"day":{"type":"integer"},"at":{"type":"string"}}}}
+	  },
 	  "required":["name"]
 	}}}}}}}}`
 	s, err := Parse([]byte(data), "dev")
@@ -73,10 +79,12 @@ func TestParseRequestBody(t *testing.T) {
 	}
 	want := []Param{
 		{Name: "count", Type: "integer"},
+		{Name: "entries", Type: "array", Fields: []Param{{Name: "at", Type: "string"}, {Name: "day", Type: "integer"}}},
 		{Name: "name", Description: "the name", Required: true, Type: "string"},
+		{Name: "owner", Type: "object", Fields: []Param{{Name: "email", Required: true, Type: "string"}}},
 		{Name: "tags", Type: "array"},
 	}
-	if got := s.Operations[0].BodyParams; !slices.Equal(got, want) {
+	if got := s.Operations[0].BodyParams; !reflect.DeepEqual(got, want) {
 		t.Errorf("body params = %+v", got)
 	}
 }

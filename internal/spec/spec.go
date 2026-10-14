@@ -49,6 +49,9 @@ type Param struct {
 	Description string
 	Required    bool
 	Type        string // JSON schema type, e.g. string, integer, boolean, array
+	// Fields are the properties of an object, or of an array's object items.
+	// Only one level deep, for help output.
+	Fields []Param
 }
 
 type rawParam struct {
@@ -63,11 +66,11 @@ type rawParam struct {
 }
 
 type rawSchema struct {
-	Properties map[string]struct {
-		Type        string `json:"type"`
-		Description string `json:"description"`
-	} `json:"properties"`
-	Required []string `json:"required"`
+	Type        string               `json:"type"`
+	Description string               `json:"description"`
+	Properties  map[string]rawSchema `json:"properties"`
+	Required    []string             `json:"required"`
+	Items       *rawSchema           `json:"items"`
 }
 
 type rawOperation struct {
@@ -174,12 +177,27 @@ func buildOperation(op rawOperation, method, path string, shared []rawParam, raw
 	}
 
 	body := op.RequestBody.Content["application/json"].Schema
-	for name, prop := range body.Properties {
-		required := slices.Contains(body.Required, name)
-		o.BodyParams = append(o.BodyParams, Param{Name: name, Description: prop.Description, Required: required, Type: prop.Type})
-	}
-	sort.Slice(o.BodyParams, func(i, j int) bool { return o.BodyParams[i].Name < o.BodyParams[j].Name })
+	o.BodyParams = properties(body, true)
 	return o
+}
+
+// properties returns a schema's properties sorted by name, with the fields of
+// object (or array of object) properties when nested is set.
+func properties(s rawSchema, nested bool) []Param {
+	var params []Param
+	for name, prop := range s.Properties {
+		p := Param{Name: name, Description: prop.Description, Required: slices.Contains(s.Required, name), Type: prop.Type}
+		if nested {
+			if prop.Type == "array" && prop.Items != nil {
+				p.Fields = properties(*prop.Items, false)
+			} else {
+				p.Fields = properties(prop, false)
+			}
+		}
+		params = append(params, p)
+	}
+	sort.Slice(params, func(i, j int) bool { return params[i].Name < params[j].Name })
+	return params
 }
 
 // Load returns the cached spec if present and usable, else the embedded snapshot.
