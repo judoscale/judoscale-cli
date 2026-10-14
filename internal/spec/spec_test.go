@@ -14,7 +14,7 @@ import (
 const miniSpec = `{
   "openapi": "3.2.0",
   "x-min-cli-version": "%s",
-  "tags": [{"name": "Things"}, {"name": "Parts"}],
+  "tags": [{"name": "Things", "description": "things"}, {"name": "Parts"}],
   "paths": {
     "/v1/things/{id}/parts/{part}": {
       "parameters": [{"name": "id", "in": "path", "required": true}],
@@ -43,7 +43,7 @@ func TestParse(t *testing.T) {
 	if len(s.Operations) != 2 {
 		t.Fatalf("ops = %+v", s.Operations)
 	}
-	if len(s.Tags) != 2 || s.Tags[0] != "Things" || s.Tags[1] != "Parts" {
+	if len(s.Tags) != 2 || s.Tags[0].Name != "Things" || s.Tags[1].Name != "Parts" || s.Tags[0].Description != "things" {
 		t.Errorf("tags = %v", s.Tags)
 	}
 	op := s.Operations[1] // sorted: deleteThingPart, getThingPart

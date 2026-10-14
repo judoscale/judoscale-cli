@@ -181,8 +181,8 @@ func groupByTag(s *spec.Spec) []helpGroup {
 	}
 
 	var order []string
-	for _, t := range s.Tags {
-		if _, ok := byTag[t]; ok && t != "" {
+	for _, tag := range s.Tags {
+		if t := tag.Name; byTag[t] != nil && t != "" {
 			order = append(order, t)
 		}
 	}

@@ -25,8 +25,13 @@ const cacheFile = "openapi.json"
 
 type Spec struct {
 	Operations []Operation
-	// Tags are the spec's tag names in their declared order.
-	Tags []string
+	// Tags are the spec's declared tags, in order.
+	Tags []Tag
+}
+
+type Tag struct {
+	Name        string
+	Description string
 }
 
 type Operation struct {
@@ -89,10 +94,8 @@ type rawOperation struct {
 type rawSpec struct {
 	MinCLIVersion string `json:"x-min-cli-version"`
 	Paths         map[string]map[string]json.RawMessage
-	Tags          []struct {
-		Name string `json:"name"`
-	} `json:"tags"`
-	Components struct {
+	Tags          []Tag `json:"tags"`
+	Components    struct {
 		Parameters map[string]rawParam `json:"parameters"`
 	} `json:"components"`
 }
@@ -112,9 +115,7 @@ func Parse(data []byte, cliVersion string) (*Spec, error) {
 	}
 
 	s := &Spec{}
-	for _, t := range raw.Tags {
-		s.Tags = append(s.Tags, t.Name)
-	}
+	s.Tags = raw.Tags
 	seen := map[string]bool{}
 	for path, item := range raw.Paths {
 		var shared []rawParam
