@@ -66,6 +66,8 @@ func (a *App) run(ctx context.Context, args []string) error {
 		return nil
 	case "api":
 		return a.runAPI(ctx, rest)
+	case "update":
+		return a.runUpdate(ctx, rest)
 	}
 
 	s, err := a.loadSpec()
@@ -141,6 +143,7 @@ Environment:
 
 	groups := []helpGroup{{"General", []helpEntry{
 		{"api", "Make a raw API request: api <METHOD> <path>"},
+		{"update", "Download the latest API spec and refresh the list of available commands"},
 		{"version", "Print the CLI version"},
 	}}}
 	if s, err := a.loadSpec(); err == nil {

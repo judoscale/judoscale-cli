@@ -72,7 +72,7 @@ func TestOnlyReadOnlyOperationsAreCommands(t *testing.T) {
 		t.Errorf("%+v", res)
 	}
 	help := run(t, nil, nil, "")
-	for _, want := range []string{"list-apps", "get-process-metric-series", "api "} {
+	for _, want := range []string{"list-apps", "get-process-metric-series", "api ", "update"} {
 		if !strings.Contains(help.stdout, want) {
 			t.Errorf("help missing %q", want)
 		}
