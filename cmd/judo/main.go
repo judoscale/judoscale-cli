@@ -15,14 +15,13 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	configDir, _ := os.UserConfigDir()
 	app := &cli.App{
 		Version:   version,
 		Stdin:     os.Stdin,
 		Stdout:    os.Stdout,
 		Stderr:    os.Stderr,
 		Getenv:    os.Getenv,
-		ConfigDir: configDir,
+		ConfigDir: cli.ConfigDir(),
 	}
 	os.Exit(app.Run(ctx, os.Args[1:]))
 }
