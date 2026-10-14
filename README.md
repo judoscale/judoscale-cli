@@ -26,13 +26,16 @@ judo list-apps
 judo list-app-processes 123
 judo get-process-metric-series 456 queue_time --from 2026-01-01T00:00:00Z --to 2026-01-02T00:00:00Z
 judo list-process-scale-events 456 --all   # follow next_cursor, merge all pages
+judo update-process 456 --max_scale 10 --autoscaling_enabled
+judo update-process 456 --queue_names '["default","mailers"]'
+judo create-api-token --data '{"label":"ci","read_only":true}'
 judo api GET /v1/team          # raw request
 judo update                    # refresh the API spec
 ```
 
 Commands are built from the Judoscale API's OpenAPI spec. Run `judo help` to list them and `judo <command> --help` for details.
 
-Only read-only (`GET`) operations are exposed as commands so far; `judo api` can send any method.
+Request body fields are flags. Boolean flags are set with `--name` or `--name=false`, and array or object fields take a JSON value. Pass `-d`/`--data` to send a whole JSON body instead (`--data -` reads it from stdin).
 
 ### Environment
 

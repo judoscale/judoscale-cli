@@ -2,9 +2,14 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
+	"slices"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -12,7 +17,7 @@ import (
 )
 
 // runOperation runs a command built from a spec operation. Path parameters are
-// positional (in path order); query parameters are flags.
+// positional (in path order); query parameters and body fields are flags.
 func (a *App) runOperation(ctx context.Context, op spec.Operation, args []string) error {
 	fs := flag.NewFlagSet(commandName(op), flag.ContinueOnError)
 	query := map[string]*string{}
@@ -22,6 +27,22 @@ func (a *App) runOperation(ctx context.Context, op spec.Operation, args []string
 	var all *bool
 	if _, paginated := query["cursor"]; paginated {
 		all = fs.Bool("all", false, "")
+	}
+	var data *string
+	if hasBody(op) {
+		data = fs.String("data", "", "")
+		fs.StringVar(data, "d", "", "")
+	}
+	fields := map[string]any{} // *string or *bool
+	for _, p := range op.BodyParams {
+		if fs.Lookup(p.Name) != nil {
+			continue // name taken by another flag; still settable via --data
+		}
+		if p.Type == "boolean" {
+			fields[p.Name] = fs.Bool(p.Name, false, "")
+		} else {
+			fields[p.Name] = fs.String(p.Name, "", "")
+		}
 	}
 
 	pos, err := parseInterleaved(fs, args)
@@ -51,20 +72,91 @@ func (a *App) runOperation(ctx context.Context, op spec.Operation, args []string
 		q.Set(p.Name, v)
 	}
 
+	body, err := a.requestBody(op, fs, data, fields)
+	if err != nil {
+		return err
+	}
+
 	c, err := a.newClient()
 	if err != nil {
 		return err
 	}
-	var body []byte
+	var resp []byte
 	if all != nil && *all {
-		body, err = c.GetAll(ctx, path, q)
+		resp, err = c.GetAll(ctx, path, q)
 	} else {
-		body, err = c.Do(ctx, op.Method, path, q, nil)
+		resp, err = c.Do(ctx, op.Method, path, q, body)
 	}
 	if err != nil {
 		return err
 	}
-	return a.printJSON(body)
+	return a.printJSON(resp)
+}
+
+func hasBody(op spec.Operation) bool {
+	switch op.Method {
+	case http.MethodPost, http.MethodPut, http.MethodPatch:
+		return true
+	}
+	return false
+}
+
+// requestBody builds the JSON body from --data, or from the body field flags
+// that were set. Fields are encoded by their schema type.
+func (a *App) requestBody(op spec.Operation, fs *flag.FlagSet, data *string, fields map[string]any) ([]byte, error) {
+	set := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
+
+	body := map[string]json.RawMessage{}
+	for _, p := range op.BodyParams {
+		v, ok := fields[p.Name]
+		if !ok || !set[p.Name] {
+			continue
+		}
+		if b, isBool := v.(*bool); isBool {
+			body[p.Name] = json.RawMessage(strconv.FormatBool(*b))
+			continue
+		}
+		raw, err := encodeField(p, *v.(*string))
+		if err != nil {
+			return nil, err
+		}
+		body[p.Name] = raw
+	}
+
+	if data == nil || *data == "" {
+		if len(body) == 0 {
+			return nil, nil
+		}
+		return json.Marshal(body)
+	}
+	if len(body) > 0 {
+		return nil, usagef("use either --data or field flags, not both")
+	}
+	if *data != "-" {
+		return []byte(*data), nil
+	}
+	return io.ReadAll(a.Stdin)
+}
+
+func encodeField(p spec.Param, v string) (json.RawMessage, error) {
+	switch p.Type {
+	case "string":
+		return json.Marshal(v)
+	case "integer":
+		if _, err := strconv.ParseInt(v, 10, 64); err != nil {
+			return nil, usagef("--%s must be an integer", p.Name)
+		}
+	case "number":
+		if _, err := strconv.ParseFloat(v, 64); err != nil {
+			return nil, usagef("--%s must be a number", p.Name)
+		}
+	default:
+		if !json.Valid([]byte(v)) {
+			return nil, usagef("--%s must be JSON", p.Name)
+		}
+	}
+	return json.RawMessage(v), nil
 }
 
 func usageLine(op spec.Operation) string {
@@ -75,26 +167,61 @@ func usageLine(op spec.Operation) string {
 	return line + " [flags]"
 }
 
+// flagType is the value placeholder shown in help for a body field.
+func flagType(t string) string {
+	switch t {
+	case "string":
+		return " string"
+	case "integer":
+		return " int"
+	case "number":
+		return " number"
+	case "boolean":
+		return ""
+	}
+	return " json"
+}
+
 func (a *App) operationHelp(op spec.Operation, paginated bool) {
 	w := a.Stdout
 	fmt.Fprintf(w, "%s\n\nUsage: %s\n", op.Summary, usageLine(op))
 	if op.Description != "" {
 		fmt.Fprintf(w, "\n%s\n", op.Description)
 	}
-	if len(op.QueryParams) == 0 && !paginated {
+	if len(op.QueryParams) == 0 && len(op.BodyParams) == 0 && !paginated && !hasBody(op) {
 		return
 	}
 	fmt.Fprint(w, "\nFlags:\n")
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	for _, p := range op.QueryParams {
-		desc := p.Description
+	describe := func(p spec.Param) string {
+		desc := firstLine(strings.TrimSpace(p.Description))
 		if p.Required {
 			desc += " (required)"
 		}
-		fmt.Fprintf(tw, "  --%s string\t%s\n", p.Name, strings.TrimSpace(desc))
+		return strings.TrimSpace(desc)
+	}
+	for _, p := range op.QueryParams {
+		fmt.Fprintf(tw, "  --%s string\t%s\n", p.Name, describe(p))
+	}
+	for _, p := range op.BodyParams {
+		fmt.Fprintf(tw, "  --%s%s\t%s\n", p.Name, flagType(p.Type), describe(p))
+	}
+	if hasBody(op) {
+		fmt.Fprintln(tw, "  -d, --data string\tJSON request body instead of field flags; use - to read it from stdin")
 	}
 	if paginated {
 		fmt.Fprintln(tw, "  --all\tFollow next_cursor and merge all pages")
 	}
 	tw.Flush()
+	if slices.ContainsFunc(op.BodyParams, func(p spec.Param) bool { return p.Type == "boolean" }) {
+		fmt.Fprintln(w, "\nBoolean flags are set with --name or --name=false.")
+	}
+}
+
+// firstLine keeps help rows to one line; full descriptions are in the API docs.
+func firstLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return s[:i]
+	}
+	return s
 }

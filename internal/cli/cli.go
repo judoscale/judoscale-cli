@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -227,14 +226,9 @@ func kebab(id string) string {
 	return b.String()
 }
 
-// commandOps returns the operations exposed as commands: read-only ones.
+// commandOps returns the operations exposed as commands, sorted by name.
 func commandOps(s *spec.Spec) []spec.Operation {
-	var ops []spec.Operation
-	for _, op := range s.Operations {
-		if op.Method == http.MethodGet {
-			ops = append(ops, op)
-		}
-	}
+	ops := slices.Clone(s.Operations)
 	sort.Slice(ops, func(i, j int) bool { return commandName(ops[i]) < commandName(ops[j]) })
 	return ops
 }

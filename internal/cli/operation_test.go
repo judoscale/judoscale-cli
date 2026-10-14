@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -66,19 +67,77 @@ func TestOperationAllPages(t *testing.T) {
 	}
 }
 
-func TestOnlyReadOnlyOperationsAreCommands(t *testing.T) {
-	res := run(t, nil, nil, "", "delete-app", "1")
-	if res.code != 2 || !strings.Contains(res.stderr, "unknown command") {
+func TestOperationBodyFromFlags(t *testing.T) {
+	srv := server(t, func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		want := `{"autoscale_metrics":["queue_time"],"autoscaling_enabled":true,"max_scale":10,"schedule_time_zone":"UTC","sniping_enabled":false}`
+		if r.Method != "PATCH" || r.URL.Path != "/v1/processes/7" || string(body) != want {
+			t.Errorf("%s %s %s", r.Method, r.URL.Path, body)
+		}
+		w.Write([]byte(`{}`))
+	})
+
+	res := run(t, srv, nil, "", "update-process", "7", "--max_scale", "10", "--autoscaling_enabled",
+		"--sniping_enabled=false", "--schedule_time_zone", "UTC", "--autoscale_metrics", `["queue_time"]`)
+	if res.code != 0 {
 		t.Errorf("%+v", res)
 	}
-	help := run(t, nil, nil, "")
-	for _, want := range []string{"list-apps", "get-process-metric-series", "api ", "update"} {
-		if !strings.Contains(help.stdout, want) {
-			t.Errorf("help missing %q", want)
+}
+
+func TestOperationBodyFromData(t *testing.T) {
+	srv := server(t, func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if string(body) != `{"label":"ci"}` {
+			t.Errorf("body = %s", body)
+		}
+		w.Write([]byte(`{}`))
+	})
+
+	if res := run(t, srv, nil, "", "create-api-token", "-d", `{"label":"ci"}`); res.code != 0 {
+		t.Errorf("--data: %+v", res)
+	}
+	if res := run(t, srv, nil, `{"label":"ci"}`, "create-api-token", "--data", "-"); res.code != 0 {
+		t.Errorf("--data -: %+v", res)
+	}
+}
+
+func TestOperationBodyErrors(t *testing.T) {
+	cases := [][]string{
+		{"update-process", "7", "--max_scale", "ten"},
+		{"update-process", "7", "--autoscale_metrics", "queue_time"},
+		{"update-process", "7", "--max_scale", "1", "--data", "{}"},
+	}
+	for _, args := range cases {
+		if res := run(t, nil, nil, "", args...); res.code != 2 {
+			t.Errorf("%v: %+v", args, res)
 		}
 	}
-	if strings.Contains(help.stdout, "delete-app") || strings.Contains(help.stdout, "update-app") {
-		t.Error("help lists write operations")
+}
+
+func TestOperationWithoutBody(t *testing.T) {
+	srv := server(t, func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if r.Method != "POST" || r.URL.Path != "/v1/apps/3/maintenance" || len(body) != 0 {
+			t.Errorf("%s %s %q", r.Method, r.URL.Path, body)
+		}
+		w.Write([]byte(`{}`))
+	})
+
+	if res := run(t, srv, nil, "", "enable-app-maintenance", "3"); res.code != 0 {
+		t.Errorf("%+v", res)
+	}
+}
+
+func TestWriteOperationHelp(t *testing.T) {
+	res := run(t, nil, nil, "", "update-process", "--help")
+	for _, want := range []string{"--max_scale int", "--autoscaling_enabled  ", "--queue_names json", "--schedule_time_zone string", "-d, --data string", "--name=false"} {
+		if !strings.Contains(res.stdout, want) {
+			t.Errorf("help missing %q:\n%s", want, res.stdout)
+		}
+	}
+	help := run(t, nil, nil, "")
+	if !strings.Contains(help.stdout, "update-process") || !strings.Contains(help.stdout, "delete-app") {
+		t.Errorf("root help missing write commands:\n%s", help.stdout)
 	}
 }
 
