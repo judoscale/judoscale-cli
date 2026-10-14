@@ -2202,7 +2202,7 @@
     },
     {
       "name": "Memberships",
-      "description": "A membership is a person's access to a team, with a role (member or admin) that controls\nwhat they can do.\n"
+      "description": "A membership is a person's access to a team. Its role (member or admin) controls what\nthey can do.\n"
     },
     {
       "name": "API Tokens",
@@ -2210,35 +2210,35 @@
     },
     {
       "name": "Apps",
-      "description": "An app is an application (group of processes) linked from your platform account\n(Heroku, Fly, Render, etc.) that Judoscale monitors and autoscales.\n\nHeroku Add-on apps include their respective subscription and plan limits.\n\nYour platform may use a different name for an \"app\", such as \"cluster\" or \"project environment\".\n"
+      "description": "An app is a group of processes that Judoscale monitors and autoscales. It's linked from\nyour platform account (Heroku, Fly, Render, etc.).\n\nHeroku Add-on apps include their respective subscription and plan limits.\n\nYour platform may use a different name for an \"app\", such as \"cluster\" or \"project environment\".\n"
     },
     {
       "name": "App Maintenance",
-      "description": "Maintenance mode allows you to pause autoscaling for an entire app, and resume it again\nwhen ready, without having to disable autoscaling for each process.\n\nThis is useful when handling tasks such as scheduled maintenance, to prevent Judoscale from\nmanaging your app's scale temporarily.\n\nEnabling maintenance will scale worker processes down to 0, and disabling it will scale them\nback to their previous values. Web processes are unchanged, and no autoscaling will trigger.\n"
+      "description": "Maintenance mode stops Judoscale from managing an app's scale. Use it during tasks such as\nscheduled maintenance, without having to disable autoscaling for each process.\n\nEnabling maintenance will scale worker processes down to 0, and disabling it will scale them\nback to their previous values. Web processes are unchanged, and no autoscaling will trigger.\n"
     },
     {
       "name": "Processes",
-      "description": "A process is a component of an app, such as web or worker, that autoscales independently,\nwith its own scale range, metrics, and schedule.\n\nYour platform may use a different name for a \"process\", such as \"service\" or \"container type\".\n"
+      "description": "A process is a component of an app, such as web or worker. Each one autoscales\nindependently, with its own scale range, metrics, and schedule.\n\nYour platform may use a different name for a \"process\", such as \"service\" or \"container type\".\n"
     },
     {
       "name": "Process Autoscale Metrics",
-      "description": "Autoscaling drives a process's scale up or down based on one or more metrics, such as queue\ntime or utilization. This is where you see which metrics are available and which currently\ndrive autoscaling for a given process. Note that a scaling schedule is also considered a metric\nsince it drives autoscaling.\n"
+      "description": "Autoscale metrics drive a process's scale up or down. Examples include queue time and\nutilization. This is where you see which metrics are available and which currently drive\nautoscaling for a given process. Note that a scaling schedule is also considered a metric\nsince it drives autoscaling.\n"
     },
     {
       "name": "Process Metrics",
-      "description": "Metrics are the raw performance data Judoscale collects for a process, independent of\nwhether they're used for autoscaling.\n"
+      "description": "Metrics are the raw performance data Judoscale collects for a process. They're collected\nwhether or not they're used for autoscaling.\n"
     },
     {
       "name": "Process Restart Events",
-      "description": "When sniping is enabled on a process (and its platform supports it), Judoscale may restart an\ninstance whose metrics stay well above the rest of the fleet, to clear a stuck or degraded one.\nOnly web processes are eligible for restarts. This is a record of those restarts.\n"
+      "description": "A restart event is a record of Judoscale restarting a process instance. When sniping is\nenabled on a process (and its platform supports it), Judoscale may restart an instance whose\nmetrics stay well above the rest of the fleet, to clear a stuck or degraded one. Only web\nprocesses are eligible for restarts.\n"
     },
     {
       "name": "Process Scale Events",
-      "description": "A scale event is any change to a process's instance count, regardless of the source, such\nas an autoscale or an external change.\n"
+      "description": "A scale event is any change to a process's instance count. It can come from any source,\nsuch as an autoscale or an external change.\n"
     },
     {
       "name": "Process Schedule",
-      "description": "A schedule sets a process's scale for specific days and times, letting it autoscale\ndifferently (or not at all) on a fixed calendar.\n\nFor a process autoscaling on `scaling_schedule`, an entry's `min_scale` and `max_scale` are\nalways equal, since the schedule is the process's only scale signal; otherwise they set the\nautoscaling range for that window.\n\nEach entry's `time` is interpreted in the process's `schedule_time_zone`. Changing that time\nzone shifts every entry's `time` and `wday` to keep firing at the same moment.\n"
+      "description": "A schedule sets a process's scale for specific days and times. It lets the process\nautoscale differently (or not at all) on a fixed calendar.\n\nFor a process autoscaling on `scaling_schedule`, an entry's `min_scale` and `max_scale` are\nalways equal, since the schedule is the process's only scale signal; otherwise they set the\nautoscaling range for that window.\n\nEach entry's `time` is interpreted in the process's `schedule_time_zone`. Changing that time\nzone shifts every entry's `time` and `wday` to keep firing at the same moment.\n"
     }
   ],
   "components": {
