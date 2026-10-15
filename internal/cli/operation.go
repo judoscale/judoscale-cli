@@ -61,20 +61,17 @@ func (a *App) runOperation(ctx context.Context, cmd command, args []string) erro
 		return usagef("usage: %s", usageLine(cmd))
 	}
 
-	path := op.Path
+	pathValues := map[string]string{}
 	for i, p := range op.PathParams {
-		path = strings.Replace(path, "{"+p.Name+"}", url.PathEscape(pos[i]), 1)
+		pathValues[p.Name] = pos[i]
 	}
-	q := url.Values{}
+	queryValues := map[string]string{}
 	for _, p := range op.QueryParams {
-		v := *query[p.Name]
-		if v == "" {
-			if p.Required {
-				return usagef("missing required flag --%s\nusage: %s", p.Name, usageLine(cmd))
-			}
-			continue
-		}
-		q.Set(p.Name, v)
+		queryValues[p.Name] = *query[p.Name]
+	}
+	path, q, missing := buildRequest(op, pathValues, queryValues)
+	if missing != "" {
+		return usagef("missing required flag --%s\nusage: %s", missing, usageLine(cmd))
 	}
 
 	if yes != nil && !*yes {
@@ -100,6 +97,32 @@ func (a *App) runOperation(ctx context.Context, cmd command, args []string) erro
 		return err
 	}
 	return a.printJSON(resp)
+}
+
+// buildRequest expands the operation's path and builds its query from values
+// by parameter name; empty query values are left out. It returns the name of
+// the first required parameter that has no value, if any.
+func buildRequest(op spec.Operation, pathValues, queryValues map[string]string) (path string, q url.Values, missing string) {
+	path = op.Path
+	for _, p := range op.PathParams {
+		v, ok := pathValues[p.Name]
+		if !ok {
+			return "", nil, p.Name
+		}
+		path = strings.Replace(path, "{"+p.Name+"}", url.PathEscape(v), 1)
+	}
+	q = url.Values{}
+	for _, p := range op.QueryParams {
+		v := queryValues[p.Name]
+		if v == "" {
+			if p.Required {
+				return "", nil, p.Name
+			}
+			continue
+		}
+		q.Set(p.Name, v)
+	}
+	return path, q, ""
 }
 
 // notDestructive lists DELETE operations that don't need --yes.

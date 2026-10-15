@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/judoscale/judoscale-cli/internal/mcp"
@@ -168,27 +167,23 @@ func (a *App) mcpCall(ctx context.Context, cmd command, args map[string]any) (st
 	op := cmd.op
 	used := map[string]bool{}
 
-	path := op.Path
+	pathValues := map[string]string{}
 	for _, p := range op.PathParams {
-		v, ok := args[p.Name]
-		if !ok {
-			return "", fmt.Errorf("missing required argument %q", p.Name)
+		if v, ok := args[p.Name]; ok {
+			pathValues[p.Name] = fmt.Sprint(v)
+			used[p.Name] = true
 		}
-		path = strings.Replace(path, "{"+p.Name+"}", url.PathEscape(fmt.Sprint(v)), 1)
-		used[p.Name] = true
 	}
-
-	q := url.Values{}
+	queryValues := map[string]string{}
 	for _, p := range op.QueryParams {
-		v, ok := args[p.Name]
-		if !ok {
-			if p.Required {
-				return "", fmt.Errorf("missing required argument %q", p.Name)
-			}
-			continue
+		if v, ok := args[p.Name]; ok {
+			queryValues[p.Name] = fmt.Sprint(v)
+			used[p.Name] = true
 		}
-		q.Set(p.Name, fmt.Sprint(v))
-		used[p.Name] = true
+	}
+	path, q, missing := buildRequest(op, pathValues, queryValues)
+	if missing != "" {
+		return "", fmt.Errorf("missing required argument %q", missing)
 	}
 
 	body := map[string]any{}
