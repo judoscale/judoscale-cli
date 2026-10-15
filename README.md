@@ -44,6 +44,16 @@ Request body fields are flags. Boolean flags are set with `--name` or `--name=fa
 
 Destructive commands, like `judo apps delete 123`, refuse to run without `--yes`. `judo api` never asks.
 
+### MCP server
+
+`judo mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server on stdin and stdout, so AI agents can call the API. Each operation is a tool named after its operation ID in snake case (`list_apps`, `update_process`), with parameters typed from the spec. It uses the same token as the other commands.
+
+```sh
+claude mcp add judoscale -- judo mcp
+```
+
+The server is read-only by default. Pass `--writes` to also expose the tools that create, update and delete, and keep in mind that the API token's own permissions still apply: a read-only token can never write.
+
 ### Environment
 
 | Variable              | Description                                         |
