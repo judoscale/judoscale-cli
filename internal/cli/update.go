@@ -17,12 +17,12 @@ func (a *App) runUpdate(ctx context.Context, args []string) error {
 		}
 		return usagef("usage: judo update")
 	}
-	if a.specDir() == "" {
+	if a.appDir() == "" {
 		return fmt.Errorf("cannot determine the user config directory")
 	}
 
 	httpClient := &http.Client{Timeout: 60 * time.Second}
-	s, path, err := spec.Update(ctx, httpClient, a.baseURL(), a.specDir(), a.Version)
+	s, path, err := spec.Update(ctx, httpClient, a.baseURL(), a.appDir(), a.Version)
 	if err != nil {
 		return err
 	}

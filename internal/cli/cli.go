@@ -85,7 +85,8 @@ func (a *App) run(ctx context.Context, args []string) error {
 	return usagef("unknown command %q; run `judo %s` to list its commands", name+" "+rest[0], name)
 }
 
-func (a *App) specDir() string {
+// appDir is where the CLI keeps its files: the cached spec and credentials.
+func (a *App) appDir() string {
 	if a.ConfigDir == "" {
 		return ""
 	}
@@ -93,7 +94,7 @@ func (a *App) specDir() string {
 }
 
 func (a *App) loadSpec() (*spec.Spec, error) {
-	s, warning, err := spec.Load(a.specDir(), a.Version)
+	s, warning, err := spec.Load(a.appDir(), a.Version)
 	if warning != "" {
 		fmt.Fprintln(a.Stderr, "Warning:", warning)
 	}
@@ -108,9 +109,12 @@ func (a *App) baseURL() string {
 }
 
 func (a *App) newClient() (*client.Client, error) {
-	token := a.Getenv("JUDOSCALE_API_TOKEN")
+	token, _, err := a.token()
+	if err != nil {
+		return nil, err
+	}
 	if token == "" {
-		return nil, errors.New("JUDOSCALE_API_TOKEN is not set")
+		return nil, errors.New("no API token: set JUDOSCALE_API_TOKEN or run `judo auth login`")
 	}
 	c := client.New(a.baseURL(), token)
 	c.UserAgent = "judoscale-cli/" + a.Version

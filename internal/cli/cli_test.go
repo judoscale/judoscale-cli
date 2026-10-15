@@ -5,6 +5,8 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -116,8 +118,57 @@ func TestAPIErrorEnvelopeExitsNonZero(t *testing.T) {
 
 func TestMissingToken(t *testing.T) {
 	res := run(t, nil, map[string]string{"JUDOSCALE_API_TOKEN": ""}, "", "api", "GET", "/v1/apps")
-	if res.code != 1 || !strings.Contains(res.stderr, "JUDOSCALE_API_TOKEN is not set") {
+	if res.code != 1 || !strings.Contains(res.stderr, "judo auth login") {
 		t.Errorf("%+v", res)
+	}
+}
+
+func TestStoredToken(t *testing.T) {
+	var got string
+	srv := server(t, func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Get("Authorization")
+		w.Write([]byte(`{}`))
+	})
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "judoscale"), 0o700)
+	os.WriteFile(filepath.Join(dir, "judoscale", "credentials"), []byte("jdo_stored\n"), 0o600)
+	noEnv := map[string]string{"JUDOSCALE_API_TOKEN": ""}
+
+	if res := runIn(t, dir, srv, noEnv, "", "api", "GET", "/v1/team"); res.code != 0 || got != "Bearer jdo_stored" {
+		t.Errorf("stored: %+v (Authorization %q)", res, got)
+	}
+	// The environment wins over the stored token.
+	if res := runIn(t, dir, srv, nil, "", "api", "GET", "/v1/team"); res.code != 0 || got != "Bearer jdo_test" {
+		t.Errorf("env: %+v (Authorization %q)", res, got)
+	}
+}
+
+func TestSaveAndRemoveToken(t *testing.T) {
+	dir := t.TempDir()
+	a := &App{ConfigDir: dir, Getenv: func(string) string { return "" }}
+
+	path, err := a.saveToken("jdo_abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != filepath.Join(dir, "judoscale", "credentials") {
+		t.Errorf("path = %s", path)
+	}
+	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
+		t.Errorf("file mode: %v %v", info, err)
+	}
+	if token, source, err := a.token(); err != nil || token != "jdo_abc" || source != path {
+		t.Errorf("token = %q from %q (%v)", token, source, err)
+	}
+
+	if removed, err := a.removeToken(); err != nil || !removed {
+		t.Errorf("remove: %v %v", removed, err)
+	}
+	if removed, err := a.removeToken(); err != nil || removed {
+		t.Errorf("remove again: %v %v", removed, err)
+	}
+	if token, _, err := a.token(); err != nil || token != "" {
+		t.Errorf("after remove: %q %v", token, err)
 	}
 }
 
