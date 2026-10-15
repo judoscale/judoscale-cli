@@ -65,6 +65,8 @@ func (a *App) run(ctx context.Context, args []string) error {
 		return a.runAPI(ctx, rest)
 	case "update":
 		return a.runUpdate(ctx, rest)
+	case "auth":
+		return a.runAuth(ctx, rest)
 	}
 
 	s, err := a.loadSpec()
@@ -146,11 +148,12 @@ func (a *App) rootHelp() error {
 Usage: judo <resource> <command> [arguments] [flags]
 
 Environment:
-  JUDOSCALE_API_TOKEN  API token (required for API commands)
+  JUDOSCALE_API_TOKEN  API token (overrides the one saved by judo auth login)
   JUDOSCALE_API_URL    API base URL (default https://api.judoscale.com)
 `)
 
 	general := []helpEntry{
+		{"auth", "Log in with an API token: auth login|logout|status"},
 		{"api", "Make a raw API request: api <METHOD> <path>"},
 		{"update", "Download the latest API spec and refresh the list of available commands"},
 		{"version", "Print the CLI version"},
