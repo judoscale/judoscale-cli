@@ -123,7 +123,7 @@ func TestOperationWithoutBody(t *testing.T) {
 		w.Write([]byte(`{}`))
 	})
 
-	if res := run(t, srv, nil, "", "maintenance", "enable", "3"); res.code != 0 {
+	if res := run(t, srv, nil, "", "apps", "enable-maintenance", "3"); res.code != 0 {
 		t.Errorf("%+v", res)
 	}
 }
@@ -145,8 +145,8 @@ func TestDeleteNeedsYes(t *testing.T) {
 	if res := run(t, srv, nil, "", "apps", "delete", "1", "--yes"); res.code != 0 || calls != 1 {
 		t.Errorf("with --yes: %+v (calls %d)", res, calls)
 	}
-	if res := run(t, srv, nil, "", "maintenance", "disable", "1"); res.code != 0 || calls != 2 {
-		t.Errorf("maintenance disable: %+v (calls %d)", res, calls)
+	if res := run(t, srv, nil, "", "apps", "disable-maintenance", "1"); res.code != 0 || calls != 2 {
+		t.Errorf("disable-maintenance:%+v (calls %d)", res, calls)
 	}
 	if res := run(t, nil, nil, "", "apps", "delete", "--help"); !strings.Contains(res.stdout, "--yes") {
 		t.Errorf("help: %s", res.stdout)

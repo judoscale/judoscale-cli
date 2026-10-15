@@ -65,6 +65,7 @@
           "API Tokens"
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -285,6 +286,7 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -356,13 +358,179 @@
         ]
       }
     },
+    "/v1/apps/{id}": {
+      "delete": {
+        "operationId": "deleteApp",
+        "summary": "Delete an app",
+        "description": "Unlinks the app from Judoscale. All autoscaling must be turned off first.",
+        "tags": [
+          "Apps"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The app was unlinked."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "get": {
+        "operationId": "getApp",
+        "summary": "Retrieve an app",
+        "description": "The app, and its subscription with plan limits (if applicable).",
+        "tags": [
+          "Apps"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The app, and its subscription with plan limits (if applicable).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/App"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "updateApp",
+        "summary": "Update an app",
+        "description": "Updates an app.",
+        "tags": [
+          "Apps"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "webhook_url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "webhook_url"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated app.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/App"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
     "/v1/apps/{app_id}/maintenance": {
       "delete": {
         "operationId": "disableAppMaintenance",
         "summary": "Disable maintenance mode",
         "description": "Resumes autoscaling and restores workers to their previous scale.",
         "tags": [
-          "App Maintenance"
+          "Apps"
         ],
         "parameters": [
           {
@@ -444,9 +612,9 @@
       "post": {
         "operationId": "enableAppMaintenance",
         "summary": "Enable maintenance mode",
-        "description": "Pauses autoscaling and scales workers to 0.",
+        "description": "Stops Judoscale from managing the app's scale, such as during scheduled maintenance, without having to disable autoscaling for each process. Worker processes scale down to 0, and web processes are unchanged.",
         "tags": [
-          "App Maintenance"
+          "Apps"
         ],
         "parameters": [
           {
@@ -586,171 +754,6 @@
         ]
       }
     },
-    "/v1/apps/{id}": {
-      "delete": {
-        "operationId": "deleteApp",
-        "summary": "Delete an app",
-        "description": "Unlinks the app from Judoscale. All autoscaling must be turned off first.",
-        "tags": [
-          "Apps"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "The app was unlinked."
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "422": {
-            "$ref": "#/components/responses/UnprocessableEntity"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalServerError"
-          }
-        },
-        "security": [
-          {
-            "ApiToken": []
-          }
-        ]
-      },
-      "get": {
-        "operationId": "getApp",
-        "summary": "Retrieve an app",
-        "description": "The app, and its subscription with plan limits (if applicable).",
-        "tags": [
-          "Apps"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The app, and its subscription with plan limits (if applicable).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/App"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalServerError"
-          }
-        },
-        "security": [
-          {
-            "ApiToken": []
-          }
-        ]
-      },
-      "patch": {
-        "operationId": "updateApp",
-        "summary": "Update an app",
-        "description": "Updates an app.",
-        "tags": [
-          "Apps"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "webhook_url": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "webhook_url"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The updated app.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/App"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "422": {
-            "$ref": "#/components/responses/UnprocessableEntity"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalServerError"
-          }
-        },
-        "security": [
-          {
-            "ApiToken": []
-          }
-        ]
-      }
-    },
     "/v1/memberships": {
       "get": {
         "operationId": "listMemberships",
@@ -805,6 +808,7 @@
           "Memberships"
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -977,6 +981,7 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -1101,6 +1106,7 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -1287,6 +1293,7 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -2006,6 +2013,7 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -2138,6 +2146,7 @@
           "Team"
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -2211,10 +2220,6 @@
     {
       "name": "Apps",
       "description": "An app is a group of processes that Judoscale monitors and autoscales. It's linked from\nyour platform account (Heroku, Fly, Render, etc.).\n\nHeroku Add-on apps include their respective subscription and plan limits.\n\nYour platform may use a different name for an \"app\", such as \"cluster\" or \"project environment\".\n"
-    },
-    {
-      "name": "App Maintenance",
-      "description": "Maintenance mode stops Judoscale from managing an app's scale. Use it during tasks such as\nscheduled maintenance, without having to disable autoscaling for each process.\n\nEnabling maintenance will scale worker processes down to 0, and disabling it will scale them\nback to their previous values. Web processes are unchanged, and no autoscaling will trigger.\n"
     },
     {
       "name": "Processes",

@@ -37,7 +37,7 @@ func TestCommandTreeSnapshot(t *testing.T) {
 		"getTeam team get",
 		"getApp apps get",
 		"listAppProcesses processes list",
-		"enableAppMaintenance maintenance enable",
+		"enableAppMaintenance apps enable-maintenance",
 		"getProcessSchedule schedule get",
 		"updateProcessAutoscaleMetrics autoscale-metrics update",
 		"getProcessMetricSeries metrics get-series",
