@@ -186,3 +186,29 @@ func TestMCPUsage(t *testing.T) {
 		t.Errorf("%+v", res)
 	}
 }
+
+func TestMCPRefusesLargeResponses(t *testing.T) {
+	var size int
+	srv := server(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"data":"` + strings.Repeat("x", size) + `"}`))
+	})
+	call := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_app","arguments":{"id":1}}}`
+	result := func() map[string]any {
+		return mcpRun(t, srv, nil, call)[0]["result"].(map[string]any)
+	}
+
+	size = mcpMaxResponse - 100
+	if got := result(); got["isError"] != false {
+		t.Errorf("response under the limit was refused: %v", got)
+	}
+
+	size = mcpMaxResponse + 100
+	got := result()
+	text := got["content"].([]any)[0].(map[string]any)["text"].(string)
+	if got["isError"] != true || !strings.Contains(text, "response too large: 101 KB (limit 100 KB)") {
+		t.Errorf("oversized response: %v", got)
+	}
+	if strings.Contains(text, "xxxx") {
+		t.Error("part of the oversized response was returned")
+	}
+}

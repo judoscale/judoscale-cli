@@ -12,6 +12,11 @@ import (
 	"github.com/judoscale/judoscale-cli/internal/spec"
 )
 
+// mcpMaxResponse bounds what a tool call returns, so one call can't fill the
+// model's context. Larger responses are refused rather than cut short, since
+// a partial result can be mistaken for the whole.
+const mcpMaxResponse = 100 << 10
+
 const mcpHelp = `Run a Model Context Protocol server on stdin and stdout, so AI agents can use the Judoscale API.
 
 Usage: judo mcp [--writes]
@@ -214,9 +219,20 @@ func (a *App) mcpCall(ctx context.Context, cmd command, args map[string]any) (st
 	if len(bytes.TrimSpace(resp)) == 0 {
 		return "Done (no content)", nil
 	}
+	text := string(resp)
 	var compact bytes.Buffer
-	if json.Compact(&compact, resp) != nil {
-		return string(resp), nil
+	if json.Compact(&compact, resp) == nil {
+		text = compact.String()
 	}
-	return compact.String(), nil
+	if len(text) > mcpMaxResponse {
+		return "", fmt.Errorf("response too large: %s (limit %s), so it was not returned. Narrow the request, for example with a much shorter from/to window, or use a tool that returns aggregates", byteSize(len(text)), byteSize(mcpMaxResponse))
+	}
+	return text, nil
+}
+
+func byteSize(n int) string {
+	if n >= 1<<20 {
+		return fmt.Sprintf("%.1f MB", float64(n)/(1<<20))
+	}
+	return fmt.Sprintf("%d KB", (n+1023)>>10)
 }

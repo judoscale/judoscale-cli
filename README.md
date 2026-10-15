@@ -54,6 +54,8 @@ claude mcp add judoscale -- judo mcp
 
 The server is read-only by default. Pass `--writes` to also expose the tools that create, update and delete, and keep in mind that the API token's own permissions still apply: a read-only token can never write.
 
+A single response over 100 KB is refused with an error rather than passed to the model, which keeps one call from filling its context. Narrow the request, for example with a shorter `from`/`to` window on the metrics tools.
+
 ### Environment
 
 | Variable              | Description                                         |
