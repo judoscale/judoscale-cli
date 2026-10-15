@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# Run commands against a live API: script/smoke-test [--writes] <base-url>
+# Needs JUDOSCALE_API_TOKEN (an admin token) and jq. Refuses to run against
+# production. Reads the first app and process it finds, and creates then deletes
+# an API token. With --writes it also updates that app and process and puts
+# the values back (and creates then deletes a schedule if there is none), so
+# don't point it at an API whose data you care about.
+set -uo pipefail
+
+cd "$(dirname "$0")/.."
+writes=0
+url=
+for arg in "$@"; do
+  case "$arg" in
+    --writes) writes=1 ;;
+    *) url="$arg" ;;
+  esac
+done
+if [ -z "$url" ]; then
+  echo "usage: script/smoke-test [--writes] <base-url>" >&2
+  exit 2
+fi
+if [ "${url%/}" = https://api.judoscale.com ]; then
+  echo "Refusing to run against production ($url)" >&2
+  exit 1
+fi
+export JUDOSCALE_API_URL="$url"
+: "${JUDOSCALE_API_TOKEN:?set JUDOSCALE_API_TOKEN}"
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+go build -o "$tmp/judo" ./cmd/judo || exit 1
+judo="$tmp/judo"
+
+failed=0
+app_json="" proc_json=""
+metrics_json='{"autoscale_metrics":[]}'
+schedule_json='{"entries":[]}'
+check() { # check <description> <command...>; leaves output in $out
+  local desc="$1"; shift
+  if out="$("$@" 2>&1)"; then
+    echo "ok    $desc"
+  else
+    echo "FAIL  $desc"
+    echo "$out" | sed 's/^/        /'
+    failed=$((failed + 1))
+    out=""
+  fi
+}
+first_id() { jq -r '[.. | objects | .id? | select(. != null)][0] // empty' <<<"$1"; }
+
+echo "Target: $JUDOSCALE_API_URL (writes: $([ "$writes" -eq 1 ] && echo on || echo off))"
+
+check "api GET /v1/team" "$judo" api GET /v1/team
+check "team get" "$judo" team get
+check "api-tokens list" "$judo" api-tokens list
+check "memberships list" "$judo" memberships list
+
+check "apps list" "$judo" apps list
+app="$(first_id "$out")"
+if [ -z "$app" ]; then
+  echo "skip  no apps; skipping app and process commands"
+else
+  check "apps get $app" "$judo" apps get "$app"
+  app_json="$out"
+  check "processes list $app" "$judo" processes list "$app"
+  proc="$(first_id "$out")"
+fi
+
+if [ -n "${proc:-}" ]; then
+  from="$(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ)"
+  to="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  check "processes get $proc" "$judo" processes get "$proc"
+  proc_json="$out"
+  check "metrics list $proc" "$judo" metrics list "$proc"
+  check "metrics get-series $proc" "$judo" metrics get-series "$proc" queue_time --from "$from" --to "$to"
+  check "metrics get-series-per-instance $proc" "$judo" metrics get-series-per-instance "$proc" queue_time --from "$from" --to "$to"
+  check "autoscale-metrics get $proc" "$judo" autoscale-metrics get "$proc"
+  metrics_json="$out"
+  check "scale-events list --all $proc" "$judo" scale-events list "$proc" --all
+  check "restart-events list --all $proc" "$judo" restart-events list "$proc" --all
+  check "schedule get $proc" "$judo" schedule get "$proc"
+  schedule_json="$out"
+fi
+
+# Writes that change the app or process, each put back to its original value.
+if [ "$writes" -eq 1 ] && [ -n "$app_json" ]; then
+  hook="$(jq -c '.webhook_url' <<<"$app_json")"
+  check "apps update $app (webhook_url)" "$judo" apps update "$app" --webhook_url https://example.com/judo-smoke
+  check "apps update $app (restore)" "$judo" apps update "$app" -d "$(jq -nc --argjson v "$hook" '{webhook_url: $v}')"
+  [ -z "$out" ] && echo "      webhook_url was left at https://example.com/judo-smoke (was $hook)"
+fi
+
+if [ "$writes" -eq 1 ] && [ -n "$proc_json" ]; then
+  max="$(jq -r '.max_scale | select(type == "number")' <<<"$proc_json")"
+  if [ -n "$max" ]; then
+    check "processes update $proc (max_scale)" "$judo" processes update "$proc" --max_scale "$((max + 1))"
+    check "processes update $proc (restore)" "$judo" processes update "$proc" --max_scale "$max"
+    [ -z "$out" ] && echo "      max_scale was left at $((max + 1)) (was $max)"
+  fi
+
+  enabled="$(jq -c '[.autoscale_metrics[] | select(.enabled) | .metric]' <<<"$metrics_json")"
+  if [ "$enabled" != "[]" ]; then
+    check "autoscale-metrics update $proc (unchanged)" "$judo" autoscale-metrics update "$proc" -d "{\"metrics\": $enabled}"
+  fi
+
+  keep="$(jq -c '{entries: [.entries[] | {id}]}' <<<"$schedule_json")"
+  if [ "$keep" != '{"entries":[]}' ]; then
+    check "schedule update $proc (unchanged)" "$judo" schedule update "$proc" -d "$keep"
+  else
+    check "schedule create $proc (default)" "$judo" schedule create "$proc"
+    keep="$(jq -c '{entries: [.entries[] | {id}]}' <<<"$out")"
+    check "schedule update $proc (unchanged)" "$judo" schedule update "$proc" -d "$keep"
+    check "schedule delete $proc" "$judo" schedule delete "$proc" --yes
+  fi
+fi
+
+label="judo-smoke-$$"
+check "api-tokens create" "$judo" api-tokens create --label "$label" --read_only
+token_id="$(first_id "$out")"
+if [ -n "$token_id" ]; then
+  check "api-tokens get $token_id" "$judo" api-tokens get "$token_id"
+  check "api-tokens update $token_id" "$judo" api-tokens update "$token_id" --label "$label-2"
+  check "api-tokens delete $token_id" "$judo" api-tokens delete "$token_id" --yes
+fi
+
+echo
+if [ "$failed" -gt 0 ]; then
+  echo "$failed failed"
+  exit 1
+fi
+echo "all passed"
