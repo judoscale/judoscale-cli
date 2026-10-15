@@ -62,7 +62,7 @@ func TestParse(t *testing.T) {
 }
 
 func TestParseRequestBody(t *testing.T) {
-	data := `{"paths":{"/a":{"patch":{"operationId":"updateA","requestBody":{"content":{"application/json":{"schema":{
+	data := `{"paths":{"/a":{"patch":{"operationId":"updateA","requestBody":{"required":true,"content":{"application/json":{"schema":{
 	  "type":"object",
 	  "properties":{
 	    "name":{"type":"string","description":"the name"},
@@ -91,6 +91,22 @@ func TestParseRequestBody(t *testing.T) {
 		{Name: "role", Type: "string", Enum: []string{"member", "admin"}},
 		{Name: "tags", Type: "array"},
 	}
+	if got := s.Operations[0].BodyParams; !reflect.DeepEqual(got, want) {
+		t.Errorf("body params = %+v", got)
+	}
+}
+
+func TestParseOptionalBodyFieldsAreNotRequired(t *testing.T) {
+	data := `{"paths":{"/a":{"post":{"operationId":"createA","requestBody":{"content":{"application/json":{"schema":{
+	  "type":"object",
+	  "properties":{"entries":{"type":"array","items":{"type":"object","properties":{"day":{"type":"integer"}},"required":["day"]}}},
+	  "required":["entries"]
+	}}}}}}}}`
+	s, err := Parse([]byte(data), "dev")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Param{{Name: "entries", Type: "array", Fields: []Param{{Name: "day", Required: true, Type: "integer"}}}}
 	if got := s.Operations[0].BodyParams; !reflect.DeepEqual(got, want) {
 		t.Errorf("body params = %+v", got)
 	}

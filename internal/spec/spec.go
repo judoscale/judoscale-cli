@@ -112,7 +112,8 @@ type rawOperation struct {
 	Description string     `json:"description"`
 	Parameters  []rawParam `json:"parameters"`
 	RequestBody struct {
-		Content map[string]struct {
+		Required bool `json:"required"`
+		Content  map[string]struct {
 			Schema rawSchema `json:"schema"`
 		} `json:"content"`
 	} `json:"requestBody"`
@@ -207,6 +208,12 @@ func buildOperation(op rawOperation, method, path string, shared []rawParam, raw
 
 	body := op.RequestBody.Content["application/json"].Schema
 	o.BodyParams = properties(body, raw.Components.Schemas, true)
+	if !op.RequestBody.Required {
+		// Fields are only required once an optional body is sent.
+		for i := range o.BodyParams {
+			o.BodyParams[i].Required = false
+		}
+	}
 	return o
 }
 
