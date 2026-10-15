@@ -1,7 +1,10 @@
 package cli
 
 import (
+	"net/http"
 	"slices"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/judoscale/judoscale-cli/internal/spec"
@@ -50,6 +53,50 @@ func TestCommandTreeSnapshot(t *testing.T) {
 	}
 	if len(names) != len(s.Operations) {
 		t.Errorf("%d commands for %d operations", len(names), len(s.Operations))
+	}
+}
+
+// TestEveryOperationRuns invokes each command in the snapshot and checks the
+// request it sends matches the operation's method and path.
+func TestEveryOperationRuns(t *testing.T) {
+	s, err := spec.Parse(spec.Snapshot, "dev")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, g := range commandTree(s) {
+		for _, c := range g.commands {
+			t.Run(c.op.ID, func(t *testing.T) {
+				var method, path string
+				srv := server(t, func(w http.ResponseWriter, r *http.Request) {
+					method, path = r.Method, r.URL.Path
+					w.Write([]byte(`{}`))
+				})
+
+				args := []string{c.group, c.name}
+				wantPath := c.op.Path
+				for i, p := range c.op.PathParams {
+					v := strconv.Itoa(i + 1)
+					args = append(args, v)
+					wantPath = strings.Replace(wantPath, "{"+p.Name+"}", v, 1)
+				}
+				for _, p := range c.op.QueryParams {
+					if p.Required {
+						args = append(args, "--"+p.Name, "x")
+					}
+				}
+				if destructive(c.op) {
+					args = append(args, "--yes")
+				}
+
+				if res := run(t, srv, nil, "", args...); res.code != 0 {
+					t.Fatalf("%v: %+v", args, res)
+				}
+				if method != c.op.Method || path != wantPath {
+					t.Errorf("sent %s %s, want %s %s", method, path, c.op.Method, wantPath)
+				}
+			})
+		}
 	}
 }
 
