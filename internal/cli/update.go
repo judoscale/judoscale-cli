@@ -12,7 +12,7 @@ import (
 func (a *App) runUpdate(ctx context.Context, args []string) error {
 	if len(args) > 0 {
 		if args[0] == "-h" || args[0] == "--help" {
-			fmt.Fprintln(a.Stdout, "Download the latest API spec from <base url>/openapi.json and cache it.\nCommands are built from the cached spec, which overrides the one built into the binary.\n\nUsage: judo update")
+			fmt.Fprintln(a.Stdout, "Download the latest API spec and cache it.\nCommands are built from the cached spec, which overrides the one built into the binary.\n\nUsage: judo update")
 			return nil
 		}
 		return usagef("usage: judo update")

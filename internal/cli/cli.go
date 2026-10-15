@@ -151,7 +151,6 @@ Usage: judo <resource> <command> [arguments] [flags]
 
 Environment:
   JUDOSCALE_API_TOKEN  API token (overrides the one saved by judo auth login)
-  JUDOSCALE_API_URL    API base URL (default https://api.judoscale.com)
 `)
 
 	general := []helpEntry{
