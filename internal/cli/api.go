@@ -16,6 +16,7 @@ Usage: judo api <METHOD> <path> [flags]
 Flags:
   -d, --data string  JSON request body; use - to read it from stdin
       --all          Follow next_cursor and merge all pages (GET only)
+      --dry-run      Print the request instead of sending it
 
 Example:
   judo api GET /v1/apps
@@ -24,10 +25,11 @@ Example:
 func (a *App) runAPI(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("api", flag.ContinueOnError)
 	var data string
-	var all bool
+	var all, dryRun bool
 	fs.StringVar(&data, "data", "", "")
 	fs.StringVar(&data, "d", "", "")
 	fs.BoolVar(&all, "all", false, "")
+	fs.BoolVar(&dryRun, "dry-run", false, "")
 
 	pos, err := parseInterleaved(fs, args)
 	if err != nil {
@@ -56,6 +58,13 @@ func (a *App) runAPI(ctx context.Context, args []string) error {
 	c, err := a.newClient()
 	if err != nil {
 		return err
+	}
+	if dryRun {
+		req, err := c.NewRequest(ctx, method, path, nil, body)
+		if err != nil {
+			return err
+		}
+		return a.printRequest(req, body)
 	}
 	var resp []byte
 	if all {

@@ -104,6 +104,16 @@ func TestAPICommandAll(t *testing.T) {
 	}
 }
 
+func TestAPICommandDryRun(t *testing.T) {
+	var calls int
+	srv := server(t, func(w http.ResponseWriter, r *http.Request) { calls++ })
+
+	res := run(t, srv, nil, "", "api", "PATCH", "/v1/team", "-d", `{"name":"x"}`, "--dry-run")
+	if res.code != 0 || calls != 0 || !strings.Contains(res.stdout, "PATCH "+srv.URL+"/v1/team\n") || !strings.Contains(res.stdout, `"name": "x"`) {
+		t.Errorf("%+v (calls %d)", res, calls)
+	}
+}
+
 func TestAPIErrorEnvelopeExitsNonZero(t *testing.T) {
 	srv := server(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)

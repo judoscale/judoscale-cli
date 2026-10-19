@@ -33,6 +33,7 @@ func (a *App) runOperation(ctx context.Context, cmd command, args []string) erro
 	if destructive(op) {
 		yes = fs.Bool("yes", false, "")
 	}
+	dryRun := fs.Bool("dry-run", false, "")
 	var data *string
 	if hasBody(op) {
 		data = fs.String("data", "", "")
@@ -74,7 +75,8 @@ func (a *App) runOperation(ctx context.Context, cmd command, args []string) erro
 		return usagef("missing required flag --%s\nusage: %s", missing, usageLine(cmd))
 	}
 
-	if yes != nil && !*yes {
+	dry := *dryRun
+	if yes != nil && !*yes && !dry {
 		return usagef("%s is destructive; pass --yes to confirm", cmd.fullName())
 	}
 
@@ -86,6 +88,13 @@ func (a *App) runOperation(ctx context.Context, cmd command, args []string) erro
 	c, err := a.newClient()
 	if err != nil {
 		return err
+	}
+	if dry {
+		req, err := c.NewRequest(ctx, op.Method, path, q, body)
+		if err != nil {
+			return err
+		}
+		return a.printRequest(req, body)
 	}
 	var resp []byte
 	if all != nil && *all {
@@ -231,9 +240,6 @@ func (a *App) operationHelp(cmd command, paginated bool) {
 	if op.Description != "" {
 		fmt.Fprintf(w, "\n%s\n", op.Description)
 	}
-	if len(op.QueryParams) == 0 && len(op.BodyParams) == 0 && !paginated && !hasBody(op) && !destructive(op) {
-		return
-	}
 	fmt.Fprint(w, "\nFlags:\n")
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	describe := func(p spec.Param) string {
@@ -265,6 +271,7 @@ func (a *App) operationHelp(cmd command, paginated bool) {
 	if destructive(op) {
 		fmt.Fprintln(tw, "  --yes\tConfirm this destructive action (required)")
 	}
+	fmt.Fprintln(tw, "  --dry-run\tPrint the request instead of sending it")
 	if paginated {
 		fmt.Fprintln(tw, "  --all\tFollow next_cursor and merge all pages")
 	}

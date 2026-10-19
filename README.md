@@ -44,6 +44,8 @@ Request body fields are flags. Boolean flags are set with `--name` or `--name=fa
 
 Destructive commands, like `judo apps delete 123`, refuse to run without `--yes`. `judo api` never asks.
 
+Add `--dry-run` to preview any command, including `judo api`. It prints the method, URL, headers (with the token masked) and the JSON body.
+
 ### MCP server
 
 `judo mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server on stdin and stdout, so AI agents can call the API. Each operation is a tool named after its operation ID in snake case (`list_apps`, `update_process`), with parameters typed from the spec. It uses the same token as the other commands.

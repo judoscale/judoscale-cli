@@ -185,14 +185,23 @@ func (c *Client) buildURL(path string, query url.Values) (string, error) {
 	return u.String(), nil
 }
 
-func (c *Client) send(ctx context.Context, method, u string, body []byte) ([]byte, int, http.Header, error) {
+// NewRequest builds the request Do would send, without sending it.
+func (c *Client) NewRequest(ctx context.Context, method, path string, query url.Values, body []byte) (*http.Request, error) {
+	u, err := c.buildURL(path, query)
+	if err != nil {
+		return nil, err
+	}
+	return c.httpRequest(ctx, method, u, body)
+}
+
+func (c *Client) httpRequest(ctx context.Context, method, u string, body []byte) (*http.Request, error) {
 	var r io.Reader
 	if body != nil {
 		r = bytes.NewReader(body)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, u, r)
 	if err != nil {
-		return nil, 0, nil, err
+		return nil, err
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", c.UserAgent)
@@ -201,6 +210,14 @@ func (c *Client) send(ctx context.Context, method, u string, body []byte) ([]byt
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	return req, nil
+}
+
+func (c *Client) send(ctx context.Context, method, u string, body []byte) ([]byte, int, http.Header, error) {
+	req, err := c.httpRequest(ctx, method, u, body)
+	if err != nil {
+		return nil, 0, nil, err
 	}
 
 	resp, err := c.HTTP.Do(req)

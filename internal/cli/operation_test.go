@@ -249,3 +249,44 @@ func TestResourceOrder(t *testing.T) {
 		last = i
 	}
 }
+
+func TestDryRunPrintsTheRequestWithoutSendingIt(t *testing.T) {
+	var calls int
+	srv := server(t, func(w http.ResponseWriter, r *http.Request) { calls++ })
+	env := map[string]string{"JUDOSCALE_API_TOKEN": "jdo_1234567890"}
+
+	res := run(t, srv, env, "", "processes", "update", "7", "--max_scale", "10", "--dry-run")
+	if res.code != 0 || calls != 0 {
+		t.Fatalf("%+v (calls %d)", res, calls)
+	}
+	for _, want := range []string{
+		"PATCH " + srv.URL + "/v1/processes/7\n",
+		"Authorization: Bearer ****7890\n",
+		"Content-Type: application/json\n",
+		"\n{\n  \"max_scale\": 10\n}\n",
+	} {
+		if !strings.Contains(res.stdout, want) {
+			t.Errorf("missing %q in:\n%s", want, res.stdout)
+		}
+	}
+	if strings.Contains(res.stdout, "jdo_1234567890") {
+		t.Errorf("token not masked:\n%s", res.stdout)
+	}
+
+	// Nothing is deleted, so --yes isn't needed.
+	if res := run(t, srv, env, "", "apps", "delete", "1", "--dry-run"); res.code != 0 || calls != 0 || !strings.HasPrefix(res.stdout, "DELETE ") {
+		t.Errorf("delete: %+v (calls %d)", res, calls)
+	}
+	// Reads can be previewed too.
+	if res := run(t, srv, env, "", "apps", "list", "--dry-run"); res.code != 0 || calls != 0 || !strings.HasPrefix(res.stdout, "GET "+srv.URL+"/v1/apps\n") {
+		t.Errorf("apps list: %+v (calls %d)", res, calls)
+	}
+}
+
+func TestDryRunInHelp(t *testing.T) {
+	for _, args := range [][]string{{"processes", "update", "--help"}, {"apps", "list", "--help"}, {"team", "get", "--help"}} {
+		if res := run(t, nil, nil, "", args...); !strings.Contains(res.stdout, "--dry-run") {
+			t.Errorf("%v:\n%s", args, res.stdout)
+		}
+	}
+}
