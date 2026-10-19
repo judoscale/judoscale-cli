@@ -46,6 +46,8 @@ Destructive commands, like `judo apps delete 123`, refuse to run without `--yes`
 
 Add `--dry-run` to preview any command, including `judo api`. It prints the method, URL, headers (with the token masked) and the JSON body.
 
+When the API rate-limits a request, the CLI waits as long as the API asks and retries, up to three times.
+
 ### MCP server
 
 `judo mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server on stdin and stdout, so AI agents can call the API. Each operation is a tool named after its operation ID in snake case (`list_apps`, `update_process`), with parameters typed from the spec. It uses the same token as the other commands.
@@ -57,6 +59,30 @@ claude mcp add judoscale -- judo mcp
 The server is read-only by default. Pass `--writes` to also expose the tools that create, update and delete, and keep in mind that the API token's own permissions still apply: a read-only token can never write.
 
 A single response over 100 KB is refused with an error rather than passed to the model, which keeps one call from filling its context. Narrow the request, for example with a shorter `from`/`to` window on the metrics tools.
+
+### AI agents
+
+Agents can use `judo` as is: output is JSON, errors go to stderr with a non-zero exit code, and `judo <resource> <command> --help` lists every flag. Give an agent its own token, and make it read-only unless it needs to change things (a `member` token also can't use admin-only actions):
+
+```sh
+judo api-tokens create --label agent --role member --read_only
+```
+
+Creating a token needs an admin token, and the plain token is only shown once.
+
+Agents that support MCP can use the MCP server above instead.
+
+To point an agent at the CLI, add something like this to its instructions (`AGENTS.md`, `CLAUDE.md`):
+
+```md
+## Judoscale
+
+Use the `judo` CLI for the Judoscale API. Output is JSON.
+
+- `judo help` lists resources, and `judo <resource> <command> --help` shows a command's flags.
+- Preview a change with `--dry-run` first. Deletes need `--yes`.
+- Use `--all` on list commands to follow pagination.
+```
 
 ### Environment
 
