@@ -86,13 +86,18 @@ Use the `judo` CLI for the Judoscale API. Output is JSON.
 
 ### Environment
 
-| Variable              | Description                                         |
-| --------------------- | --------------------------------------------------- |
-| `JUDOSCALE_API_TOKEN` | API token, overrides the one from `judo auth login` |
+| Variable                    | Description                                         |
+| --------------------------- | --------------------------------------------------- |
+| `JUDOSCALE_API_TOKEN`       | API token, overrides the one from `judo auth login` |
+| `JUDOSCALE_NO_UPDATE_CHECK` | Set to turn off the daily update check              |
 
 ### API spec
 
 The binary embeds a snapshot of the spec. `judo update` downloads the latest spec from the Judoscale API to `~/.config/judoscale/openapi.json` (or `$XDG_CONFIG_HOME/judoscale/`, `%AppData%\judoscale\` on Windows), and that copy overrides the snapshot. The CLI never updates it on its own. If the latest spec needs a newer CLI, `judo update` asks you to upgrade instead.
+
+### Updates
+
+On a terminal, the CLI checks once a day whether a newer release exists and prints a one-line notice. It never updates itself. It stays quiet in CI (`CI` set), for `judo api` and `judo mcp`, and when piped, and `JUDOSCALE_NO_UPDATE_CHECK` turns it off.
 
 ### Exit codes
 

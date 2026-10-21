@@ -30,6 +30,10 @@ type App struct {
 	Getenv  func(string) string
 	// ConfigDir is the user config dir; the spec cache lives in <ConfigDir>/judoscale.
 	ConfigDir string
+	// Interactive is true when stderr is a terminal; update notices only show then.
+	Interactive bool
+	// ReleasesURL overrides the endpoint that reports the latest CLI release.
+	ReleasesURL string
 }
 
 type usageError struct{ msg string }
@@ -41,6 +45,9 @@ func usagef(format string, a ...any) error { return usageError{fmt.Sprintf(forma
 func (a *App) Run(ctx context.Context, args []string) int {
 	err := a.run(ctx, args)
 	if err == nil || errors.Is(err, flagHelp) {
+		if len(args) > 0 && args[0] != "api" && args[0] != "mcp" {
+			a.notifyUpdates(ctx)
+		}
 		return exitOK
 	}
 	fmt.Fprintln(a.Stderr, "Error:", err)

@@ -360,6 +360,25 @@ func checkVersion(min, cli string) error {
 	return nil
 }
 
+// IsNewer reports whether version a is newer than b. Unparseable versions are
+// never newer.
+func IsNewer(a, b string) bool {
+	va, err := parseVersion(a)
+	if err != nil {
+		return false
+	}
+	vb, err := parseVersion(b)
+	if err != nil {
+		return false
+	}
+	for i := range va {
+		if va[i] != vb[i] {
+			return va[i] > vb[i]
+		}
+	}
+	return false
+}
+
 func parseVersion(v string) ([3]int, error) {
 	var out [3]int
 	v = strings.TrimPrefix(v, "v")

@@ -19,5 +19,8 @@ func main() {
 		Getenv:    os.Getenv,
 		ConfigDir: cli.ConfigDir(),
 	}
+	if info, err := os.Stderr.Stat(); err == nil {
+		app.Interactive = info.Mode()&os.ModeCharDevice != 0
+	}
 	os.Exit(app.Run(context.Background(), os.Args[1:]))
 }
