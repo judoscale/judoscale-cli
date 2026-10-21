@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"os"
-	"os/signal"
 
 	"github.com/judoscale/judoscale-cli/internal/cli"
 )
@@ -12,9 +11,6 @@ import (
 var version = "dev"
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
-
 	app := &cli.App{
 		Version:   version,
 		Stdin:     os.Stdin,
@@ -23,5 +19,5 @@ func main() {
 		Getenv:    os.Getenv,
 		ConfigDir: cli.ConfigDir(),
 	}
-	os.Exit(app.Run(ctx, os.Args[1:]))
+	os.Exit(app.Run(context.Background(), os.Args[1:]))
 }
