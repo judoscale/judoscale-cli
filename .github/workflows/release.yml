@@ -65,4 +65,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: snapshot
-          path: dist/*.*
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
