@@ -1,0 +1,49 @@
+name: Update spec
+
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    name: Refresh embedded spec
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: script/update-spec
+      - name: Open a PR if the spec changed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git diff --quiet internal/spec/openapi.json && exit 0
+          branch=update-api-spec
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          git add internal/spec/openapi.json
+          git commit -m "fix: update the embedded API spec"
+          git push --force origin "$branch"
+
+          # A failing spec still gets a PR, as a draft, so the breakage is visible.
+          body='Refreshed with `script/update-spec`. Tests pass.'
+          draft=
+          if ! script/test; then
+            body='Refreshed with `script/update-spec`. **Tests fail** with this spec.'
+            draft=--draft
+          fi
+
+          if gh pr view "$branch" >/dev/null 2>&1; then
+            gh pr edit "$branch" --body "$body"
+            if [ -n "$draft" ]; then gh pr ready "$branch" --undo; else gh pr ready "$branch"; fi
+          else
+            gh pr create --head "$branch" $draft --body "$body" \
+              --title "fix: update the embedded API spec"
+          fi

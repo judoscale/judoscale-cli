@@ -105,4 +105,4 @@ script/test   # go vet + go test
 script/build
 ```
 
-The embedded snapshot lives in `internal/spec/openapi.json`. Refresh it with `script/update-spec [base-url]` (production by default; requires `jq`), which downloads the spec through `judo update`, drops examples and points `servers` at production. Run `script/build` afterwards to embed it.
+The embedded snapshot lives in `internal/spec/openapi.json`. Refresh it with `script/update-spec [base-url]` (production by default; requires `jq`), which downloads the spec through `judo update`, drops examples and points `servers` at production. Run `script/build` afterwards to embed it. A daily workflow also runs `script/update-spec` and opens a PR when the spec changes.
