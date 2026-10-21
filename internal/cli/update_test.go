@@ -42,6 +42,25 @@ func TestUpdateWritesCacheWhichOverridesSnapshot(t *testing.T) {
 	}
 }
 
+func TestUpdateSaysWhenSpecIsCurrent(t *testing.T) {
+	srv := server(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("If-None-Match") == `"v1"` {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		w.Header().Set("ETag", `"v1"`)
+		w.Write([]byte(`{"paths":{"/a":{"get":{"operationId":"a"}}}}`))
+	})
+	dir := t.TempDir()
+
+	if res := runIn(t, dir, srv, nil, "", "update"); !strings.HasPrefix(res.stdout, "Updated API spec") {
+		t.Errorf("first: %+v", res)
+	}
+	if res := runIn(t, dir, srv, nil, "", "update"); res.code != 0 || !strings.HasPrefix(res.stdout, "API spec is already up to date (1 operations)") {
+		t.Errorf("second: %+v", res)
+	}
+}
+
 func TestUpdateRefusesSpecNeedingNewerCLI(t *testing.T) {
 	srv := server(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"x-min-cli-version":"99.0.0","paths":{"/a":{"get":{"operationId":"a"}}}}`))

@@ -21,7 +21,10 @@ import (
 //go:embed openapi.json
 var Snapshot []byte
 
-const cacheFile = "openapi.json"
+const (
+	cacheFile     = "openapi.json"
+	cacheETagFile = "openapi.etag"
+)
 
 type Spec struct {
 	Operations []Operation
@@ -286,55 +289,91 @@ func Load(configDir, cliVersion string) (s *Spec, warning string, err error) {
 	return s, warning, err
 }
 
-// Update downloads the spec from baseURL/openapi.json and caches it. The
-// download is validated first, so a bad spec never replaces a good cache.
-func Update(ctx context.Context, httpClient *http.Client, baseURL, configDir, cliVersion string) (*Spec, string, error) {
+// Update downloads the spec from baseURL/openapi.json and caches it, along
+// with its ETag. If the cached copy is still current, nothing is written and
+// changed is false. The download is validated first, so a bad spec never
+// replaces a good cache.
+func Update(ctx context.Context, httpClient *http.Client, baseURL, configDir, cliVersion string) (s *Spec, path string, changed bool, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(baseURL, "/")+"/openapi.json", nil)
 	if err != nil {
-		return nil, "", err
+		return nil, "", false, err
 	}
 	req.Header.Set("Accept", "application/json")
+	path = filepath.Join(configDir, cacheFile)
+	cached, cacheErr := os.ReadFile(path)
+	if etag := readETag(configDir); etag != "" && cacheErr == nil {
+		req.Header.Set("If-None-Match", etag)
+	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, "", err
+		return nil, "", false, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotModified && cacheErr == nil {
+		s, err := Parse(cached, cliVersion)
+		return s, path, false, err
+	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, "", fmt.Errorf("downloading spec: %s", resp.Status)
+		return nil, "", false, fmt.Errorf("downloading spec: %s", resp.Status)
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
 	if err != nil {
-		return nil, "", err
+		return nil, "", false, err
 	}
 
-	s, err := Parse(data, cliVersion)
+	s, err = Parse(data, cliVersion)
 	if err != nil {
-		return nil, "", err
+		return nil, "", false, err
 	}
 	if len(s.Operations) == 0 {
-		return nil, "", errors.New("downloaded spec has no operations with an operationId")
+		return nil, "", false, errors.New("downloaded spec has no operations with an operationId")
 	}
 
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		return nil, "", err
+		return nil, "", false, err
 	}
-	path := filepath.Join(configDir, cacheFile)
-	tmp, err := os.CreateTemp(configDir, cacheFile+".*")
+	if err := writeAtomic(configDir, cacheFile, data); err != nil {
+		return nil, "", false, err
+	}
+	if etag := resp.Header.Get("ETag"); etag != "" {
+		err = writeAtomic(configDir, cacheETagFile, []byte(etag))
+	} else {
+		err = os.Remove(filepath.Join(configDir, cacheETagFile))
+		if errors.Is(err, os.ErrNotExist) {
+			err = nil
+		}
+	}
 	if err != nil {
-		return nil, "", err
+		return nil, "", false, err
+	}
+	return s, path, true, nil
+}
+
+// readETag returns the ETag saved with the cached spec, or "".
+func readETag(configDir string) string {
+	data, err := os.ReadFile(filepath.Join(configDir, cacheETagFile))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
+// writeAtomic replaces dir/name with data via a temp file and rename.
+func writeAtomic(dir, name string, data []byte) error {
+	tmp, err := os.CreateTemp(dir, name+".*")
+	if err != nil {
+		return err
 	}
 	defer os.Remove(tmp.Name())
 	if _, err := tmp.Write(data); err != nil {
 		tmp.Close()
-		return nil, "", err
+		return err
 	}
 	if err := tmp.Close(); err != nil {
-		return nil, "", err
+		return err
 	}
-	if err := os.Rename(tmp.Name(), path); err != nil {
-		return nil, "", err
-	}
-	return s, path, nil
+	return os.Rename(tmp.Name(), filepath.Join(dir, name))
 }
 
 func checkVersion(min, cli string) error {

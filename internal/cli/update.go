@@ -22,9 +22,13 @@ func (a *App) runUpdate(ctx context.Context, args []string) error {
 	}
 
 	httpClient := &http.Client{Timeout: 60 * time.Second}
-	s, path, err := spec.Update(ctx, httpClient, a.baseURL(), a.appDir(), a.Version)
+	s, path, changed, err := spec.Update(ctx, httpClient, a.baseURL(), a.appDir(), a.Version)
 	if err != nil {
 		return err
+	}
+	if !changed {
+		fmt.Fprintf(a.Stdout, "API spec is already up to date (%d operations) at %s\n", len(s.Operations), path)
+		return nil
 	}
 	fmt.Fprintf(a.Stdout, "Updated API spec (%d operations) at %s\n", len(s.Operations), path)
 	return nil

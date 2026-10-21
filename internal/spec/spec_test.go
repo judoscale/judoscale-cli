@@ -210,16 +210,66 @@ func TestUpdate(t *testing.T) {
 	defer srv.Close()
 	dir := filepath.Join(t.TempDir(), "judoscale")
 
-	s, path, err := Update(context.Background(), srv.Client(), srv.URL, dir, "dev")
+	s, path, changed, err := Update(context.Background(), srv.Client(), srv.URL, dir, "dev")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(s.Operations) != 2 || path != filepath.Join(dir, cacheFile) {
+	if len(s.Operations) != 2 || path != filepath.Join(dir, cacheFile) || !changed {
 		t.Errorf("ops=%d path=%s", len(s.Operations), path)
 	}
 	cached, _, _ := Load(dir, "dev")
 	if len(cached.Operations) != 2 {
 		t.Errorf("cache not used after update")
+	}
+}
+
+func TestUpdateUsesETag(t *testing.T) {
+	etag, body := `W/"abc"`, mini("")
+	var conditional []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got := r.Header.Get("If-None-Match")
+		conditional = append(conditional, got)
+		if got == etag {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		w.Header().Set("ETag", etag)
+		w.Write(body)
+	}))
+	defer srv.Close()
+	dir := t.TempDir()
+	update := func() bool {
+		t.Helper()
+		_, _, changed, err := Update(context.Background(), srv.Client(), srv.URL, dir, "dev")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return changed
+	}
+
+	if !update() || readETag(dir) != etag {
+		t.Errorf("first update: etag %q", readETag(dir))
+	}
+	if update() {
+		t.Error("unchanged spec reported as changed")
+	}
+	if got := strings.Join(conditional, "|"); got != "|"+etag {
+		t.Errorf("If-None-Match sent: %q", got)
+	}
+
+	// The ETag only counts alongside a cached spec.
+	os.Remove(filepath.Join(dir, cacheFile))
+	if !update() {
+		t.Error("missing cache should download again")
+	}
+	if conditional[len(conditional)-1] != "" {
+		t.Errorf("sent If-None-Match without a cache: %q", conditional)
+	}
+
+	// A new spec replaces the saved ETag.
+	etag, body = `W/"def"`, mini("")
+	if !update() || readETag(dir) != `W/"def"` {
+		t.Errorf("etag after change: %q", readETag(dir))
 	}
 }
 
@@ -233,7 +283,7 @@ func TestUpdateRefusesBadSpecAndKeepsCache(t *testing.T) {
 		"no operations": []byte(`{"paths":{}}`),
 	} {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write(body) }))
-		if _, _, err := Update(context.Background(), srv.Client(), srv.URL, dir, "1.0.0"); err == nil {
+		if _, _, _, err := Update(context.Background(), srv.Client(), srv.URL, dir, "1.0.0"); err == nil {
 			t.Errorf("%s: expected error", name)
 		}
 		srv.Close()
@@ -249,7 +299,7 @@ func TestUpdateRefusesBadSpecAndKeepsCache(t *testing.T) {
 func TestUpdateHTTPError(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
-	if _, _, err := Update(context.Background(), srv.Client(), srv.URL, t.TempDir(), "dev"); err == nil || !strings.Contains(err.Error(), "404") {
+	if _, _, _, err := Update(context.Background(), srv.Client(), srv.URL, t.TempDir(), "dev"); err == nil || !strings.Contains(err.Error(), "404") {
 		t.Fatalf("err = %v", err)
 	}
 }
