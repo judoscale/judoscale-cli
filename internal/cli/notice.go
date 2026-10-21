@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/judoscale/judoscale-cli/internal/spec"
@@ -24,10 +25,10 @@ type updateCheckState struct {
 	CheckedAt time.Time `json:"checked_at"`
 }
 
-// notifyUpdates prints a hint when a newer CLI release exists. It checks at
-// most once a day, only on a terminal, and never fails the command.
+// notifyUpdates prints a hint when a newer CLI release or API spec exists. It
+// checks at most once a day, only on a terminal, and never fails the command.
 func (a *App) notifyUpdates(ctx context.Context) {
-	if !a.Interactive || a.Version == "dev" || a.appDir() == "" ||
+	if !a.Interactive || a.appDir() == "" ||
 		a.Getenv("CI") != "" || a.Getenv("JUDOSCALE_NO_UPDATE_CHECK") != "" {
 		return
 	}
@@ -37,10 +38,57 @@ func (a *App) notifyUpdates(ctx context.Context) {
 
 	ctx, cancel := context.WithTimeout(ctx, updateCheckWait)
 	defer cancel()
-	latest, err := a.latestRelease(ctx)
-	if err == nil && spec.IsNewer(latest, a.Version) {
-		fmt.Fprintf(a.Stderr, "\nA new version of judo is available: %s (you have %s)\n", latest, a.Version)
+	var cliNotice, specNotice string
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); cliNotice = a.cliUpdateNotice(ctx) }()
+	go func() { defer wg.Done(); specNotice = a.specUpdateNotice(ctx) }()
+	wg.Wait()
+
+	var notices []string
+	for _, n := range []string{cliNotice, specNotice} {
+		if n != "" {
+			notices = append(notices, n)
+		}
 	}
+	if len(notices) > 0 {
+		fmt.Fprintf(a.Stderr, "\n%s\n", strings.Join(notices, "\n"))
+	}
+}
+
+func (a *App) cliUpdateNotice(ctx context.Context) string {
+	if a.Version == "dev" {
+		return ""
+	}
+	latest, err := a.latestRelease(ctx)
+	if err != nil || !spec.IsNewer(latest, a.Version) {
+		return ""
+	}
+	return fmt.Sprintf("A new version of judo is available: %s (you have %s)", latest, a.Version)
+}
+
+// specUpdateNotice asks the API whether the spec in use is still current,
+// with a conditional request that doesn't download the spec.
+func (a *App) specUpdateNotice(ctx context.Context) string {
+	etag := spec.ETag(a.appDir())
+	if etag == "" {
+		return ""
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, strings.TrimRight(a.baseURL(), "/")+"/openapi.json", nil)
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("If-None-Match", etag)
+	req.Header.Set("User-Agent", "judoscale-cli/"+a.Version)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return ""
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return ""
+	}
+	return "A newer API spec is available. Run `judo update` to get it."
 }
 
 // updateCheckDue reports whether a check is due, and records it as done so a

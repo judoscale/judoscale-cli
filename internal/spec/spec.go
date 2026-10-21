@@ -21,6 +21,11 @@ import (
 //go:embed openapi.json
 var Snapshot []byte
 
+// snapshotETag is the ETag the API served for the snapshot (empty if it sent none).
+//
+//go:embed openapi.etag
+var snapshotETag string
+
 const (
 	cacheFile     = "openapi.json"
 	cacheETagFile = "openapi.etag"
@@ -348,6 +353,17 @@ func Update(ctx context.Context, httpClient *http.Client, baseURL, configDir, cl
 		return nil, "", false, err
 	}
 	return s, path, true, nil
+}
+
+// ETag returns the ETag of the spec in use: the cached copy's, or the
+// snapshot's when there is no cache. It is "" when unknown.
+func ETag(configDir string) string {
+	if configDir != "" {
+		if _, err := os.Stat(filepath.Join(configDir, cacheFile)); err == nil {
+			return readETag(configDir)
+		}
+	}
+	return strings.TrimSpace(snapshotETag)
 }
 
 // readETag returns the ETag saved with the cached spec, or "".

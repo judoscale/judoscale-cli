@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Refresh the embedded spec snapshot: script/update-spec [base-url]
 # Downloads the spec with `judo update`, drops examples and points servers at production.
+# Also saves the spec's ETag, which the CLI uses to tell when the snapshot is out of date.
 # Requires jq 1.6+.
 set -euo pipefail
 
@@ -17,5 +18,6 @@ jq 'walk(if type == "object" then del(.example, .examples) else . end)
     | .servers = [{"url": "https://api.judoscale.com"}]' \
   "$tmp/config/judoscale/openapi.json" > "$tmp/openapi.json"
 mv "$tmp/openapi.json" internal/spec/openapi.json
+cp "$tmp/config/judoscale/openapi.etag" internal/spec/openapi.etag 2>/dev/null || : > internal/spec/openapi.etag
 
-echo "Wrote internal/spec/openapi.json"
+echo "Wrote internal/spec/openapi.json and openapi.etag"

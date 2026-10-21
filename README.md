@@ -97,7 +97,7 @@ The binary embeds a snapshot of the spec. `judo update` downloads the latest spe
 
 ### Updates
 
-On a terminal, the CLI checks once a day whether a newer release exists and prints a one-line notice. It never updates itself. It stays quiet in CI (`CI` set), for `judo api` and `judo mcp`, and when piped, and `JUDOSCALE_NO_UPDATE_CHECK` turns it off.
+On a terminal, the CLI checks once a day whether a newer release or API spec exists and prints a one-line notice. It never updates itself: run `judo update` for the spec, and upgrade the CLI the way you installed it. It stays quiet in CI (`CI` set), for `judo api` and `judo mcp`, and when piped, and `JUDOSCALE_NO_UPDATE_CHECK` turns it off.
 
 ### Exit codes
 
@@ -110,4 +110,4 @@ script/test   # go vet + go test
 script/build
 ```
 
-The embedded snapshot lives in `internal/spec/openapi.json`. Refresh it with `script/update-spec [base-url]` (production by default; requires `jq`), which downloads the spec through `judo update`, drops examples and points `servers` at production. Run `script/build` afterwards to embed it. A daily workflow also runs `script/update-spec` and opens a PR when the spec changes.
+The embedded snapshot lives in `internal/spec/openapi.json`, with its ETag alongside it in `openapi.etag`. Refresh both with `script/update-spec [base-url]` (production by default; requires `jq`), which downloads the spec through `judo update`, drops examples and points `servers` at production. Run `script/build` afterwards to embed it. A daily workflow also runs `script/update-spec` and opens a PR when the spec changes.

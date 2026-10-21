@@ -23,12 +23,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git diff --quiet internal/spec/openapi.json && exit 0
+          [ -z "$(git status --porcelain internal/spec)" ] && exit 0
           branch=update-api-spec
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -B "$branch"
-          git add internal/spec/openapi.json
+          git add internal/spec/openapi.json internal/spec/openapi.etag
           git commit -m "fix: update the embedded API spec"
           git push --force origin "$branch"
 
