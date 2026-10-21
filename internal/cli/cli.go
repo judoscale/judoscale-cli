@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
@@ -119,6 +120,23 @@ func (a *App) baseURL() string {
 	return client.DefaultBaseURL
 }
 
+// httpClient is for requests outside the API client (spec downloads, update
+// checks). It sends the CLI's User-Agent.
+func (a *App) httpClient() *http.Client {
+	return &http.Client{Timeout: client.DefaultTimeout, Transport: userAgentTransport{client.UserAgent(a.Version), http.DefaultTransport}}
+}
+
+type userAgentTransport struct {
+	userAgent string
+	next      http.RoundTripper
+}
+
+func (t userAgentTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	r.Header.Set("User-Agent", t.userAgent)
+	return t.next.RoundTrip(r)
+}
+
 func (a *App) newClient() (*client.Client, error) {
 	token, _, err := a.token()
 	if err != nil {
@@ -127,12 +145,17 @@ func (a *App) newClient() (*client.Client, error) {
 	if token == "" {
 		return nil, errors.New("no API token: set JUDOSCALE_API_TOKEN or run `judo auth login`")
 	}
+	return a.apiClient(token), nil
+}
+
+// apiClient is an API client for token, which need not be the stored one.
+func (a *App) apiClient(token string) *client.Client {
 	c := client.New(a.baseURL(), token)
-	c.UserAgent = "judoscale-cli/" + a.Version
+	c.UserAgent = client.UserAgent(a.Version)
 	c.OnRetry = func(wait time.Duration) {
 		fmt.Fprintf(a.Stderr, "Rate limited; retrying in %s\n", wait)
 	}
-	return c, nil
+	return c
 }
 
 // printJSON pretty-prints a JSON response body.

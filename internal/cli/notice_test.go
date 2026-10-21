@@ -24,6 +24,9 @@ type noticeAPI struct {
 func newNoticeAPI(t *testing.T, tag, specETag string) *noticeAPI {
 	n := &noticeAPI{tag: tag, specETag: specETag}
 	n.Server = server(t, func(w http.ResponseWriter, r *http.Request) {
+		if ua := r.Header.Get("User-Agent"); !strings.HasPrefix(ua, "judoscale-cli/") {
+			t.Errorf("User-Agent = %q", ua)
+		}
 		if r.URL.Path == "/openapi.json" {
 			n.specHits++
 			if r.Method != http.MethodHead || r.Header.Get("If-None-Match") == n.specETag {

@@ -18,6 +18,7 @@ import (
 
 const (
 	DefaultBaseURL = "https://api.judoscale.com"
+	DefaultTimeout = 35 * time.Second // a whole request, including reading the body
 	maxRetries     = 3
 	maxBodyBytes   = 32 << 20
 )
@@ -50,6 +51,9 @@ type Client struct {
 	sleep func(context.Context, time.Duration) error
 }
 
+// UserAgent is the User-Agent every request from the CLI carries.
+func UserAgent(version string) string { return "judoscale-cli/" + version }
+
 func New(baseURL, token string) *Client {
 	if baseURL == "" {
 		baseURL = DefaultBaseURL
@@ -59,7 +63,7 @@ func New(baseURL, token string) *Client {
 		Token:     token,
 		UserAgent: "judoscale-cli",
 		HTTP: &http.Client{
-			Timeout: 60 * time.Second,
+			Timeout: DefaultTimeout,
 			// The API never redirects; following one could also turn a write into a GET.
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		},

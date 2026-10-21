@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-
-	"github.com/judoscale/judoscale-cli/internal/client"
 )
 
 const authHelp = `Log in with a Judoscale API token, so you don't need JUDOSCALE_API_TOKEN.
@@ -51,9 +49,7 @@ func (a *App) runAuth(ctx context.Context, args []string) error {
 // returns the raw response and the team's name.
 // TestTeamNameIsInTheSpec guards the name field against spec changes.
 func (a *App) fetchTeam(ctx context.Context, token string) (body []byte, name string, err error) {
-	c := client.New(a.baseURL(), token)
-	c.UserAgent = "judoscale-cli/" + a.Version
-	body, err = c.Do(ctx, "GET", "/v1/team", nil, nil)
+	body, err = a.apiClient(token).Do(ctx, "GET", "/v1/team", nil, nil)
 	if err != nil {
 		return nil, "", err
 	}

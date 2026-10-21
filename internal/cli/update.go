@@ -3,8 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"time"
 
 	"github.com/judoscale/judoscale-cli/internal/spec"
 )
@@ -21,8 +19,7 @@ func (a *App) runUpdate(ctx context.Context, args []string) error {
 		return fmt.Errorf("cannot determine the user config directory")
 	}
 
-	httpClient := &http.Client{Timeout: 60 * time.Second}
-	s, path, changed, err := spec.Update(ctx, httpClient, a.baseURL(), a.appDir(), a.Version)
+	s, path, changed, err := spec.Update(ctx, a.httpClient(), a.baseURL(), a.appDir(), a.Version)
 	if err != nil {
 		return err
 	}

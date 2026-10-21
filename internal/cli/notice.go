@@ -79,8 +79,7 @@ func (a *App) specUpdateNotice(ctx context.Context) string {
 		return ""
 	}
 	req.Header.Set("If-None-Match", etag)
-	req.Header.Set("User-Agent", "judoscale-cli/"+a.Version)
-	res, err := http.DefaultClient.Do(req)
+	res, err := a.httpClient().Do(req)
 	if err != nil {
 		return ""
 	}
@@ -119,8 +118,7 @@ func (a *App) latestRelease(ctx context.Context) (string, error) {
 		return "", err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "judoscale-cli/"+a.Version)
-	res, err := http.DefaultClient.Do(req)
+	res, err := a.httpClient().Do(req)
 	if err != nil {
 		return "", err
 	}

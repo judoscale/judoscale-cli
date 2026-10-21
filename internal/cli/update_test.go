@@ -44,6 +44,9 @@ func TestUpdateWritesCacheWhichOverridesSnapshot(t *testing.T) {
 
 func TestUpdateSaysWhenSpecIsCurrent(t *testing.T) {
 	srv := server(t, func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("User-Agent"); got != "judoscale-cli/dev" {
+			t.Errorf("User-Agent = %q", got)
+		}
 		if r.Header.Get("If-None-Match") == `"v1"` {
 			w.WriteHeader(http.StatusNotModified)
 			return
