@@ -1596,7 +1596,7 @@
       "get": {
         "operationId": "listProcessRestartEvents",
         "summary": "List a process's restart events",
-        "description": "The process's instance restarts, newest first. Events are kept for 4 months.",
+        "description": "The process's instance restarts, newest first. Events are kept for 12 months.",
         "responses": {
           "200": {
             "content": {
