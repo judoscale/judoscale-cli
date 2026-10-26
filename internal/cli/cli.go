@@ -114,7 +114,7 @@ func (a *App) loadSpec() (*spec.Spec, error) {
 }
 
 func (a *App) baseURL() string {
-	if u := a.Getenv("JUDOSCALE_API_URL"); u != "" {
+	if u := a.Getenv("JUDO_API_URL"); u != "" {
 		return u
 	}
 	return client.DefaultBaseURL
@@ -143,7 +143,7 @@ func (a *App) newClient() (*client.Client, error) {
 		return nil, err
 	}
 	if token == "" {
-		return nil, errors.New("no API token: set JUDOSCALE_API_TOKEN or run `judo auth login`")
+		return nil, errors.New("no API token: set JUDO_API_TOKEN or run `judo auth login`")
 	}
 	return a.apiClient(token), nil
 }
@@ -180,7 +180,7 @@ func (a *App) rootHelp() error {
 Usage: judo <resource> <command> [arguments] [flags]
 
 Environment:
-  JUDOSCALE_API_TOKEN  API token (overrides the one saved by judo auth login)
+  JUDO_API_TOKEN  API token (overrides the one saved by judo auth login)
 `)
 
 	general := []helpEntry{

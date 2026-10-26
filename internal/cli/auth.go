@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const authHelp = `Log in with a Judoscale API token, so you don't need JUDOSCALE_API_TOKEN.
+const authHelp = `Log in with a Judoscale API token, so you don't need JUDO_API_TOKEN.
 
 Usage: judo auth <command>
 
@@ -19,7 +19,7 @@ Commands:
   logout  Remove the saved token
   status  Show where the token comes from and the team it belongs to
 
-JUDOSCALE_API_TOKEN takes precedence over the saved token.
+JUDO_API_TOKEN takes precedence over the saved token.
 `
 
 func (a *App) runAuth(ctx context.Context, args []string) error {
@@ -100,8 +100,8 @@ func (a *App) authLogin(ctx context.Context, args []string) error {
 	}
 
 	fmt.Fprintf(a.Stdout, "Logged in to %s\nSaved to %s\n", name, path)
-	if a.Getenv("JUDOSCALE_API_TOKEN") != "" {
-		fmt.Fprintln(a.Stdout, "Note: JUDOSCALE_API_TOKEN is set and takes precedence over the saved token.")
+	if a.Getenv("JUDO_API_TOKEN") != "" {
+		fmt.Fprintln(a.Stdout, "Note: JUDO_API_TOKEN is set and takes precedence over the saved token.")
 	}
 	return nil
 }
@@ -116,8 +116,8 @@ func (a *App) authLogout() error {
 	} else {
 		fmt.Fprintln(a.Stdout, "No saved token.")
 	}
-	if a.Getenv("JUDOSCALE_API_TOKEN") != "" {
-		fmt.Fprintln(a.Stdout, "Note: JUDOSCALE_API_TOKEN is still set.")
+	if a.Getenv("JUDO_API_TOKEN") != "" {
+		fmt.Fprintln(a.Stdout, "Note: JUDO_API_TOKEN is still set.")
 	}
 	return nil
 }
@@ -128,7 +128,7 @@ func (a *App) authStatus(ctx context.Context) error {
 		return err
 	}
 	if token == "" {
-		return errors.New("not logged in; run `judo auth login` or set JUDOSCALE_API_TOKEN")
+		return errors.New("not logged in; run `judo auth login` or set JUDO_API_TOKEN")
 	}
 	fmt.Fprintf(a.Stdout, "Token: %s (from %s)\n", mask(token), source)
 	fmt.Fprintf(a.Stdout, "API:   %s\n", a.baseURL())

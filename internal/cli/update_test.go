@@ -72,7 +72,7 @@ func TestUpdateRefusesSpecNeedingNewerCLI(t *testing.T) {
 	var out, errOut bytes.Buffer
 	app := &App{Version: "1.0.0", Stdout: &out, Stderr: &errOut, ConfigDir: dir,
 		Getenv: func(k string) string {
-			if k == "JUDOSCALE_API_URL" {
+			if k == "JUDO_API_URL" {
 				return srv.URL
 			}
 			return ""

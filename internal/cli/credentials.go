@@ -20,8 +20,8 @@ func (a *App) credentialsPath() string {
 // token returns the API token and where it came from: the environment first,
 // then the stored credentials file. It is empty if neither has one.
 func (a *App) token() (token, source string, err error) {
-	if t := a.Getenv("JUDOSCALE_API_TOKEN"); t != "" {
-		return t, "JUDOSCALE_API_TOKEN", nil
+	if t := a.Getenv("JUDO_API_TOKEN"); t != "" {
+		return t, "JUDO_API_TOKEN", nil
 	}
 	path := a.credentialsPath()
 	if path == "" {

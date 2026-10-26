@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run commands against a live API: script/smoke-test [--writes] <base-url>
-# Needs JUDOSCALE_API_TOKEN (an admin token) and jq. Refuses to run against
+# Needs JUDO_API_TOKEN (an admin token) and jq. Refuses to run against
 # production. Reads the first app and process it finds, and creates then deletes
 # an API token, and the same reads through `judo mcp`. With --writes it also
 # updates that app and process and puts the values back (and creates then
@@ -25,8 +25,8 @@ if [ "${url%/}" = https://api.judoscale.com ]; then
   echo "Refusing to run against production ($url)" >&2
   exit 1
 fi
-export JUDOSCALE_API_URL="$url"
-: "${JUDOSCALE_API_TOKEN:?set JUDOSCALE_API_TOKEN}"
+export JUDO_API_URL="$url"
+: "${JUDO_API_TOKEN:?set JUDO_API_TOKEN}"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -79,7 +79,7 @@ mcp_read_only_tools() {
 }
 first_id() { jq -r '[.. | objects | .id? | select(. != null)][0] // empty' <<<"$1"; }
 
-echo "Target: $JUDOSCALE_API_URL (writes: $([ "$writes" -eq 1 ] && echo on || echo off))"
+echo "Target: $JUDO_API_URL (writes: $([ "$writes" -eq 1 ] && echo on || echo off))"
 
 check "api GET /v1/team" "$judo" api GET /v1/team
 check "team get" "$judo" team get

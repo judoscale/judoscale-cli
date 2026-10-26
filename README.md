@@ -20,7 +20,7 @@ Create an API token in your Judoscale team settings and log in with it:
 judo auth login
 ```
 
-The token is checked against the API and saved to `~/.config/judoscale/credentials`, readable only by you. In CI and scripts, set `JUDOSCALE_API_TOKEN` instead (or pipe the token in with `judo auth login --with-token`). The environment variable takes precedence over the saved token.
+The token is checked against the API and saved to `~/.config/judoscale/credentials`, readable only by you. In CI and scripts, set `JUDO_API_TOKEN` instead (or pipe the token in with `judo auth login --with-token`). The environment variable takes precedence over the saved token.
 
 `judo auth status` shows where the token comes from and which team it belongs to, and `judo auth logout` removes the saved one.
 
@@ -86,10 +86,10 @@ Use the `judo` CLI for the Judoscale API. Output is JSON.
 
 ### Environment
 
-| Variable                    | Description                                         |
-| --------------------------- | --------------------------------------------------- |
-| `JUDOSCALE_API_TOKEN`       | API token, overrides the one from `judo auth login` |
-| `JUDOSCALE_NO_UPDATE_CHECK` | Set to turn off the daily update check              |
+| Variable               | Description                                         |
+| ---------------------- | --------------------------------------------------- |
+| `JUDO_API_TOKEN`       | API token, overrides the one from `judo auth login` |
+| `JUDO_NO_UPDATE_CHECK` | Set to turn off the daily update check              |
 
 ### API spec
 
@@ -97,7 +97,7 @@ The binary embeds a snapshot of the spec. `judo update` downloads the latest spe
 
 ### Updates
 
-On a terminal, the CLI checks once a day whether a newer release or API spec exists and prints a one-line notice. It never updates itself: run `judo update` for the spec, and upgrade the CLI the way you installed it. It stays quiet in CI (`CI` set), for `judo api` and `judo mcp`, and when piped, and `JUDOSCALE_NO_UPDATE_CHECK` turns it off.
+On a terminal, the CLI checks once a day whether a newer release or API spec exists and prints a one-line notice. It never updates itself: run `judo update` for the spec, and upgrade the CLI the way you installed it. It stays quiet in CI (`CI` set), for `judo api` and `judo mcp`, and when piped, and `JUDO_NO_UPDATE_CHECK` turns it off.
 
 ### Exit codes
 

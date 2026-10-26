@@ -253,7 +253,7 @@ func TestResourceOrder(t *testing.T) {
 func TestDryRunPrintsTheRequestWithoutSendingIt(t *testing.T) {
 	var calls int
 	srv := server(t, func(w http.ResponseWriter, r *http.Request) { calls++ })
-	env := map[string]string{"JUDOSCALE_API_TOKEN": "jdo_1234567890"}
+	env := map[string]string{"JUDO_API_TOKEN": "jdo_1234567890"}
 
 	res := run(t, srv, env, "", "processes", "update", "7", "--max_scale", "10", "--dry-run")
 	if res.code != 0 || calls != 0 {

@@ -29,7 +29,7 @@ type updateCheckState struct {
 // checks at most once a day, only on a terminal, and never fails the command.
 func (a *App) notifyUpdates(ctx context.Context) {
 	if !a.Interactive || a.appDir() == "" ||
-		a.Getenv("CI") != "" || a.Getenv("JUDOSCALE_NO_UPDATE_CHECK") != "" {
+		a.Getenv("CI") != "" || a.Getenv("JUDO_NO_UPDATE_CHECK") != "" {
 		return
 	}
 	if !a.updateCheckDue() {

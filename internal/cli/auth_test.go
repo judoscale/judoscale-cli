@@ -30,7 +30,7 @@ func teamServer(t *testing.T) string {
 func TestAuthLoginSavesToken(t *testing.T) {
 	url := teamServer(t)
 	dir := t.TempDir()
-	env := map[string]string{"JUDOSCALE_API_TOKEN": "", "JUDOSCALE_API_URL": url}
+	env := map[string]string{"JUDO_API_TOKEN": "", "JUDO_API_URL": url}
 
 	res := runIn(t, dir, nil, env, "good\n", "auth", "login")
 	if res.code != 0 || !strings.Contains(res.stdout, "Logged in to Acme") {
@@ -47,7 +47,7 @@ func TestAuthLoginSavesToken(t *testing.T) {
 
 func TestAuthLoginWithToken(t *testing.T) {
 	url := teamServer(t)
-	env := map[string]string{"JUDOSCALE_API_TOKEN": "", "JUDOSCALE_API_URL": url}
+	env := map[string]string{"JUDO_API_TOKEN": "", "JUDO_API_URL": url}
 
 	res := runIn(t, t.TempDir(), nil, env, "good", "auth", "login", "--with-token")
 	if res.code != 0 || strings.Contains(res.stderr, "Paste") {
@@ -58,7 +58,7 @@ func TestAuthLoginWithToken(t *testing.T) {
 func TestAuthLoginRejectsBadToken(t *testing.T) {
 	url := teamServer(t)
 	dir := t.TempDir()
-	env := map[string]string{"JUDOSCALE_API_TOKEN": "", "JUDOSCALE_API_URL": url}
+	env := map[string]string{"JUDO_API_TOKEN": "", "JUDO_API_URL": url}
 
 	res := runIn(t, dir, nil, env, "bad\n", "auth", "login")
 	if res.code != 1 || !strings.Contains(res.stderr, "unauthorized") {
@@ -75,7 +75,7 @@ func TestAuthLoginRejectsBadToken(t *testing.T) {
 func TestAuthStatusAndLogout(t *testing.T) {
 	url := teamServer(t)
 	dir := t.TempDir()
-	env := map[string]string{"JUDOSCALE_API_TOKEN": "", "JUDOSCALE_API_URL": url}
+	env := map[string]string{"JUDO_API_TOKEN": "", "JUDO_API_URL": url}
 
 	if res := runIn(t, dir, nil, env, "", "auth", "status"); res.code != 1 || !strings.Contains(res.stderr, "not logged in") {
 		t.Errorf("logged out: %+v", res)
@@ -97,10 +97,10 @@ func TestAuthStatusAndLogout(t *testing.T) {
 
 func TestAuthStatusFromEnv(t *testing.T) {
 	url := teamServer(t)
-	env := map[string]string{"JUDOSCALE_API_TOKEN": "good", "JUDOSCALE_API_URL": url}
+	env := map[string]string{"JUDO_API_TOKEN": "good", "JUDO_API_URL": url}
 
 	res := runIn(t, t.TempDir(), nil, env, "", "auth", "status")
-	if res.code != 0 || !strings.Contains(res.stdout, "from JUDOSCALE_API_TOKEN") {
+	if res.code != 0 || !strings.Contains(res.stdout, "from JUDO_API_TOKEN") {
 		t.Errorf("%+v", res)
 	}
 }

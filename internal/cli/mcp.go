@@ -26,7 +26,7 @@ and named after its operationId in snake_case (list_apps, update_process).
 Only read operations are exposed unless --writes is given.
 
 Add it to an agent, for example: claude mcp add judoscale -- judo mcp
-It uses the token from JUDOSCALE_API_TOKEN or judo auth login.
+It uses the token from JUDO_API_TOKEN or judo auth login.
 `
 
 func (a *App) runMCP(ctx context.Context, args []string) error {

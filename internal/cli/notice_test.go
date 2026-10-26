@@ -46,7 +46,7 @@ func newNoticeAPI(t *testing.T, tag, specETag string) *noticeAPI {
 // GitHub and the API replaced by api.
 func notifyRun(t *testing.T, dir string, api *noticeAPI, env map[string]string, args ...string) string {
 	t.Helper()
-	e := map[string]string{"JUDOSCALE_API_URL": api.URL}
+	e := map[string]string{"JUDO_API_URL": api.URL}
 	for k, v := range env {
 		e[k] = v
 	}
@@ -140,7 +140,7 @@ func TestSpecNoticeOnDevBuild(t *testing.T) {
 		Stdin:       strings.NewReader(""),
 		Stdout:      &bytes.Buffer{},
 		Stderr:      &errOut,
-		Getenv:      func(k string) string { return map[string]string{"JUDOSCALE_API_URL": api.URL}[k] },
+		Getenv:      func(k string) string { return map[string]string{"JUDO_API_URL": api.URL}[k] },
 		ConfigDir:   t.TempDir(),
 		Interactive: true,
 		ReleasesURL: api.URL + "/releases/latest",
@@ -156,7 +156,7 @@ func TestUpdateNoticeSkipped(t *testing.T) {
 
 	for name, env := range map[string]map[string]string{
 		"CI":      {"CI": "true"},
-		"opt-out": {"JUDOSCALE_NO_UPDATE_CHECK": "1"},
+		"opt-out": {"JUDO_NO_UPDATE_CHECK": "1"},
 	} {
 		if out := notifyRun(t, t.TempDir(), api, env, "version"); out != "" {
 			t.Errorf("%s: %q", name, out)

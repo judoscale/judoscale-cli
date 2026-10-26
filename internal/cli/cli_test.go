@@ -25,9 +25,9 @@ func run(t *testing.T, srv *httptest.Server, env map[string]string, stdin string
 func runIn(t *testing.T, configDir string, srv *httptest.Server, env map[string]string, stdin string, args ...string) result {
 	t.Helper()
 	var out, errOut bytes.Buffer
-	e := map[string]string{"JUDOSCALE_API_TOKEN": "jdo_test"}
+	e := map[string]string{"JUDO_API_TOKEN": "jdo_test"}
 	if srv != nil {
-		e["JUDOSCALE_API_URL"] = srv.URL
+		e["JUDO_API_URL"] = srv.URL
 	}
 	for k, v := range env {
 		e[k] = v
@@ -127,7 +127,7 @@ func TestAPIErrorEnvelopeExitsNonZero(t *testing.T) {
 }
 
 func TestMissingToken(t *testing.T) {
-	res := run(t, nil, map[string]string{"JUDOSCALE_API_TOKEN": ""}, "", "api", "GET", "/v1/apps")
+	res := run(t, nil, map[string]string{"JUDO_API_TOKEN": ""}, "", "api", "GET", "/v1/apps")
 	if res.code != 1 || !strings.Contains(res.stderr, "judo auth login") {
 		t.Errorf("%+v", res)
 	}
@@ -142,7 +142,7 @@ func TestStoredToken(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "judoscale"), 0o700)
 	os.WriteFile(filepath.Join(dir, "judoscale", "credentials"), []byte("jdo_stored\n"), 0o600)
-	noEnv := map[string]string{"JUDOSCALE_API_TOKEN": ""}
+	noEnv := map[string]string{"JUDO_API_TOKEN": ""}
 
 	if res := runIn(t, dir, srv, noEnv, "", "api", "GET", "/v1/team"); res.code != 0 || got != "Bearer jdo_stored" {
 		t.Errorf("stored: %+v (Authorization %q)", res, got)
