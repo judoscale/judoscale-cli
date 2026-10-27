@@ -4,17 +4,43 @@ Official command line client for [Judoscale](https://judoscale.com). Built for h
 
 ## Install
 
+With [Homebrew](https://brew.sh):
+
+```sh
+brew install judoscale/tap/judo
+```
+
+Or with the install script:
+
 ```sh
 curl -fsSL https://raw.githubusercontent.com/judoscale/judoscale-cli/main/install.sh | sh
 ```
 
-This installs the latest release for macOS or Linux (amd64 or arm64), verifies its checksum, and puts `judo` (plus a `judoscale` alias) in `/usr/local/bin`, or `~/.local/bin` when that isn't writable. Set `JUDO_VERSION` to pin a version and `JUDO_INSTALL_DIR` to choose the directory. Windows binaries are on the [releases page](https://github.com/judoscale/judoscale-cli/releases).
+The script installs the latest release for macOS or Linux (amd64 or arm64), verifies its checksum, and puts `judo` (plus a `judoscale` alias) in `/usr/local/bin`, or `~/.local/bin` when that isn't writable. Set `JUDO_VERSION` to pin a version and `JUDO_INSTALL_DIR` to choose the directory.
+
+Windows binaries are on the [releases page](https://github.com/judoscale/judoscale-cli/releases).
 
 From source (Go required):
 
 ```sh
 go build -o judo ./cmd/judo
 ```
+
+### Uninstall
+
+Run `judo auth logout` to remove the saved token, then remove the CLI. With Homebrew:
+
+```sh
+brew uninstall judo
+```
+
+If you used the install script, delete the binary and the alias:
+
+```sh
+rm "$(command -v judo)" "$(command -v judoscale)"
+```
+
+The CLI keeps its other data, such as the cached API spec, in `~/.config/judoscale/`; delete that directory to remove everything.
 
 ## Usage
 
@@ -101,7 +127,7 @@ The binary embeds a snapshot of the spec. `judo update` downloads the latest spe
 
 ### Updates
 
-On a terminal, the CLI checks once a day whether a newer release or API spec exists and prints a one-line notice. It never updates itself: run `judo update` for the spec, and upgrade the CLI the way you installed it. It stays quiet in CI (`CI` set), for `judo api` and `judo mcp`, and when piped, and `JUDO_NO_UPDATE_CHECK` turns it off.
+On a terminal, the CLI checks once a day whether a newer release or API spec exists and prints a one-line notice. It never updates itself: run `judo update` for the spec, and upgrade the CLI the way you installed it: `brew upgrade judo` for Homebrew, or run the install script again. It stays quiet in CI (`CI` set), for `judo api` and `judo mcp`, and when piped, and `JUDO_NO_UPDATE_CHECK` turns it off.
 
 ### Exit codes
 
@@ -115,3 +141,7 @@ script/build
 ```
 
 The embedded snapshot lives in `internal/spec/openapi.json`, with its ETag alongside it in `openapi.etag`. Refresh both with `script/update-spec [base-url]` (production by default; requires `jq`), which downloads the spec through `judo update`, drops examples and points `servers` at production. Run `script/build` afterwards to embed it. A daily workflow also runs `script/update-spec` and opens a PR when the spec changes.
+
+### Releasing
+
+Use [conventional commit](https://www.conventionalcommits.org) messages and squash-merge PRs. [release-please](https://github.com/googleapis/release-please) keeps a release PR open with the next version and changelog; merging it tags the release, attaches the binaries built by GoReleaser, and updates the Homebrew formula in [judoscale/homebrew-tap](https://github.com/judoscale/homebrew-tap).
