@@ -43,12 +43,15 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      # GITHUB_TOKEN can't push the formula to the tap repo.
+      # The token covers this repo (release assets) and the tap (formula).
       - uses: actions/create-github-app-token@v3.3.0
         id: app
         with:
           client-id: ${{ vars.AUTOMATION_OSS_APP_CLIENT_ID }}
           private-key: ${{ secrets.AUTOMATION_OSS_APP_PRIVATE_KEY }}
+          repositories: |
+            judoscale-cli
+            homebrew-tap
       - uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
