@@ -20,6 +20,22 @@ archives:
 checksum:
   name_template: checksums.txt
 
+brews:
+  - name: judo
+    repository:
+      owner: judoscale
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: https://judoscale.com
+    description: Official command line client for Judoscale
+    license: MIT
+    install: |
+      bin.install "judo"
+      bin.install_symlink "judo" => "judoscale"
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/judo version")
+
 # release-please owns the changelog and creates the GitHub release.
 changelog:
   disable: true

@@ -37,9 +37,18 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      # GITHUB_TOKEN can't push to another repo, so the formula uses an app
+      # token scoped to the tap.
+      - uses: actions/create-github-app-token@v3.3.0
+        id: tap
+        with:
+          client-id: ${{ vars.AUTOMATION_OSS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.AUTOMATION_OSS_APP_PRIVATE_KEY }}
+          repositories: homebrew-tap
       - uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAP_GITHUB_TOKEN: ${{ steps.tap.outputs.token }}
