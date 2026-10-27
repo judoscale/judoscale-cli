@@ -5,8 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   release-please:
@@ -16,9 +15,16 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
+      # An app token, unlike GITHUB_TOKEN, lets the Release PR trigger CI.
+      - uses: actions/create-github-app-token@v3.3.0
+        id: app
+        with:
+          client-id: ${{ vars.AUTOMATION_OSS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.AUTOMATION_OSS_APP_PRIVATE_KEY }}
       - id: release
         uses: googleapis/release-please-action@v5
         with:
+          token: ${{ steps.app.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
@@ -37,18 +43,16 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      # GITHUB_TOKEN can't push to another repo, so the formula uses an app
-      # token scoped to the tap.
+      # GITHUB_TOKEN can't push the formula to the tap repo.
       - uses: actions/create-github-app-token@v3.3.0
-        id: tap
+        id: app
         with:
           client-id: ${{ vars.AUTOMATION_OSS_APP_CLIENT_ID }}
           private-key: ${{ secrets.AUTOMATION_OSS_APP_PRIVATE_KEY }}
-          repositories: homebrew-tap
       - uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAP_GITHUB_TOKEN: ${{ steps.tap.outputs.token }}
+          GITHUB_TOKEN: ${{ steps.app.outputs.token }}
+          TAP_GITHUB_TOKEN: ${{ steps.app.outputs.token }}
