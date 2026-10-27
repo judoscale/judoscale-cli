@@ -4,7 +4,11 @@ Official command line client for [Judoscale](https://judoscale.com). Built for h
 
 ## Install
 
-_Coming soon: Homebrew tap and a `curl` install script._
+```sh
+curl -fsSL https://raw.githubusercontent.com/judoscale/judoscale-cli/main/install.sh | sh
+```
+
+This installs the latest release for macOS or Linux (amd64 or arm64), verifies its checksum, and puts `judo` (plus a `judoscale` alias) in `/usr/local/bin`, or `~/.local/bin` when that isn't writable. Set `JUDO_VERSION` to pin a version and `JUDO_INSTALL_DIR` to choose the directory. Windows binaries are on the [releases page](https://github.com/judoscale/judoscale-cli/releases).
 
 From source (Go required):
 
