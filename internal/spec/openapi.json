@@ -1514,7 +1514,7 @@
       "get": {
         "operationId": "getProcessMetricSeriesPerInstance",
         "summary": "Retrieve a metric's time series per instance",
-        "description": "The metric's data points split by instance. The same window, bucket, and retention rules apply. Only available for `queue_time`, `response_time`.",
+        "description": "The metric's data points split by instance. The same window, bucket, and retention rules apply. Only available for `queue_time`, `response_time`. At most 25 instances are returned: the ones that reported most recently, then the highest values.",
         "tags": [
           "Process Metrics"
         ],
@@ -1565,6 +1565,89 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MetricSeriesPerInstance"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
+    "/v1/processes/{process_id}/metrics/{metric}/per_queue": {
+      "get": {
+        "operationId": "getProcessMetricSeriesPerQueue",
+        "summary": "Retrieve a metric's time series per queue",
+        "description": "The metric's data points split by queue. The same window, bucket, and retention rules apply. Only available for worker processes, for `queue_time`, `queue_depth`, `queue_busy`. Returns the queues the process monitors, at most 25: the ones that reported most recently, then the highest values.",
+        "tags": [
+          "Process Metrics"
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ISO 8601 timestamp. Records at or after this time."
+          },
+          {
+            "name": "metric",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "queue_time",
+                "queue_depth",
+                "queue_busy"
+              ]
+            }
+          },
+          {
+            "name": "process_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ISO 8601 timestamp. Records strictly before this time. Must not precede `from`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The metric's data points per queue over the requested window.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricSeriesPerQueue"
                 }
               }
             }
@@ -2598,6 +2681,72 @@
           "unit",
           "bucket_width_seconds",
           "instances"
+        ]
+      },
+      "MetricSeriesPerQueue": {
+        "description": "A metric's data points over a time window, split by queue.",
+        "type": "object",
+        "properties": {
+          "metric": {
+            "type": "string",
+            "enum": [
+              "queue_time",
+              "queue_depth",
+              "queue_busy"
+            ]
+          },
+          "unit": {
+            "description": "How the metric's values are measured.",
+            "type": "string"
+          },
+          "bucket_width_seconds": {
+            "description": "Width of each bucket, in seconds, determined by the time window.",
+            "type": "integer"
+          },
+          "queues": {
+            "description": "One entry per queue the process monitors, each covering the same buckets.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "queue": {
+                  "description": "The queue name reported by the adapter.",
+                  "type": "string"
+                },
+                "points": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "time": {
+                        "description": "Start of the bucket.",
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "value": {
+                        "type": "number",
+                        "format": "float"
+                      }
+                    },
+                    "required": [
+                      "time",
+                      "value"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "queue",
+                "points"
+              ]
+            }
+          }
+        },
+        "required": [
+          "metric",
+          "unit",
+          "bucket_width_seconds",
+          "queues"
         ]
       },
       "Process": {
