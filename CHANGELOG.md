@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.4](https://github.com/judoscale/judoscale-cli/compare/v0.0.3...v0.0.4) (2026-10-28)
+
+
+### Bug Fixes
+
+* remove the MCP server ([ebda077](https://github.com/judoscale/judoscale-cli/commit/ebda077b1c59a4236645124fa9548aad8165f92d))
+
 ## [0.0.3](https://github.com/judoscale/judoscale-cli/compare/v0.0.2...v0.0.3) (2026-10-27)
 
 
