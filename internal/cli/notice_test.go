@@ -162,7 +162,7 @@ func TestUpdateNoticeSkipped(t *testing.T) {
 			t.Errorf("%s: %q", name, out)
 		}
 	}
-	for _, args := range [][]string{{"api", "--help"}, {"mcp", "--help"}} {
+	for _, args := range [][]string{{"api", "--help"}} {
 		if out := notifyRun(t, t.TempDir(), api, nil, args...); out != "" {
 			t.Errorf("%v: %q", args, out)
 		}

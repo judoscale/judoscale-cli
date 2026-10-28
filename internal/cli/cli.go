@@ -46,7 +46,7 @@ func usagef(format string, a ...any) error { return usageError{fmt.Sprintf(forma
 func (a *App) Run(ctx context.Context, args []string) int {
 	err := a.run(ctx, args)
 	if err == nil || errors.Is(err, flagHelp) {
-		if len(args) > 0 && args[0] != "api" && args[0] != "mcp" {
+		if len(args) > 0 && args[0] != "api" {
 			a.notifyUpdates(ctx)
 		}
 		return exitOK
@@ -75,8 +75,6 @@ func (a *App) run(ctx context.Context, args []string) error {
 		return a.runUpdate(ctx, rest)
 	case "auth":
 		return a.runAuth(ctx, rest)
-	case "mcp":
-		return a.runMCP(ctx, rest)
 	}
 
 	s, err := a.loadSpec()
@@ -185,7 +183,6 @@ Environment:
 
 	general := []helpEntry{
 		{"auth", "Log in with an API token: auth login|logout|status"},
-		{"mcp", "Run an MCP server for AI agents: mcp [--writes]"},
 		{"api", "Make a raw API request: api <METHOD> <path>"},
 		{"update", "Download the latest API spec and refresh the list of available commands"},
 		{"version", "Print the CLI version"},

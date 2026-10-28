@@ -2,10 +2,9 @@
 # Run commands against a live API: script/smoke-test [--writes] <base-url>
 # Needs JUDO_API_TOKEN (an admin token) and jq. Refuses to run against
 # production. Reads the first app and process it finds, and creates then deletes
-# an API token, and the same reads through `judo mcp`. With --writes it also
-# updates that app and process and puts the values back (and creates then
-# deletes a schedule if there is none), so don't point it at an API whose data
-# you care about.
+# an API token. With --writes it also updates that app and process and puts the
+# values back (and creates then deletes a schedule if there is none), so don't
+# point it at an API whose data you care about.
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
@@ -47,35 +46,6 @@ check() { # check <description> <command...>; leaves output in $out
     failed=$((failed + 1))
     out=""
   fi
-}
-# mcp_send <flags> <message>...: run `judo mcp` with an initialize handshake
-# followed by the messages; prints the responses, one per line.
-mcp_send() {
-  local flags="$1"; shift
-  printf '%s\n' \
-    '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}' \
-    '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
-    "$@" | "$judo" mcp $flags
-}
-# mcp_tool <flags> <tool> <arguments-json>: call one tool; prints its result text.
-mcp_tool() {
-  local resp
-  resp="$(mcp_send "$1" "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"$2\",\"arguments\":$3}}" \
-    | jq -c 'select(.id == 1)')"
-  if [ "$(jq -r '.result.isError' <<<"$resp")" != false ]; then
-    jq -r '.error.message // .result.content[0].text // "no response"' <<<"$resp"
-    return 1
-  fi
-  jq -r '.result.content[0].text' <<<"$resp"
-}
-mcp_tool_names() {
-  mcp_send "$1" '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | jq -r 'select(.id == 1) | .result.tools[].name'
-}
-mcp_read_only_tools() {
-  local names
-  names="$(mcp_tool_names "")" || return 1
-  grep -qx get_team <<<"$names" || { echo "get_team is missing"; return 1; }
-  ! grep -qx update_app <<<"$names" || { echo "update_app is exposed without --writes"; return 1; }
 }
 first_id() { jq -r '[.. | objects | .id? | select(. != null)][0] // empty' <<<"$1"; }
 
@@ -152,28 +122,6 @@ if [ -n "$token_id" ]; then
   check "api-tokens get $token_id" "$judo" api-tokens get "$token_id"
   check "api-tokens update $token_id" "$judo" api-tokens update "$token_id" --label "$label-2"
   check "api-tokens delete $token_id" "$judo" api-tokens delete "$token_id" --yes
-fi
-
-# The same through the MCP server.
-check "mcp tools/list is read-only" mcp_read_only_tools
-check "mcp get_team" mcp_tool "" get_team '{}'
-check "mcp list_apps" mcp_tool "" list_apps '{}'
-if [ -n "$app" ]; then
-  check "mcp get_app $app" mcp_tool "" get_app "{\"id\": $app}"
-  check "mcp list_app_processes $app" mcp_tool "" list_app_processes "{\"app_id\": $app}"
-fi
-if [ -n "${proc:-}" ]; then
-  check "mcp get_process $proc" mcp_tool "" get_process "{\"id\": $proc}"
-fi
-
-if [ "$writes" -eq 1 ] && [ -n "$app_json" ]; then
-  hook="$(jq -c '.webhook_url' <<<"$app_json")"
-  check "mcp update_app $app (unchanged)" mcp_tool --writes update_app "$(jq -nc --argjson id "$app" --argjson v "$hook" '{id: $id, webhook_url: $v}')"
-fi
-if [ "$writes" -eq 1 ] && [ -n "${max:-}" ]; then
-  check "mcp update_process $proc (max_scale)" mcp_tool --writes update_process "{\"id\": $proc, \"max_scale\": $((max + 1))}"
-  check "mcp update_process $proc (restore)" mcp_tool --writes update_process "{\"id\": $proc, \"max_scale\": $max}"
-  [ -z "$out" ] && echo "      max_scale was left at $((max + 1)) (was $max)"
 fi
 
 echo
