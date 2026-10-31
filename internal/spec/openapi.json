@@ -1773,7 +1773,7 @@
       "get": {
         "operationId": "listProcessScaleEvents",
         "summary": "List a process's scale events",
-        "description": "The process's scaling events, newest first. Events are kept for 4 months.",
+        "description": "The process's scaling events, newest first. Events are kept for 12 months.",
         "tags": [
           "Process Scale Events"
         ],
