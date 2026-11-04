@@ -46,9 +46,9 @@ func TestParse(t *testing.T) {
 	if len(s.Tags) != 2 || s.Tags[0].Name != "Things" || s.Tags[1].Name != "Parts" || s.Tags[0].Description != "things" {
 		t.Errorf("tags = %v", s.Tags)
 	}
-	op := s.Operations[1] // sorted: deleteThingPart, getThingPart
-	if op.Tag != "Parts" || s.Operations[0].Tag != "" {
-		t.Errorf("tags: get=%q delete=%q", op.Tag, s.Operations[0].Tag)
+	op := s.Operations[0] // document order: getThingPart, deleteThingPart
+	if op.Tag != "Parts" || s.Operations[1].Tag != "" {
+		t.Errorf("tags: get=%q delete=%q", op.Tag, s.Operations[1].Tag)
 	}
 	if op.ID != "getThingPart" || op.Method != "GET" || op.Path != "/v1/things/{id}/parts/{part}" {
 		t.Errorf("op = %+v", op)
@@ -58,6 +58,25 @@ func TestParse(t *testing.T) {
 	}
 	if len(op.QueryParams) != 2 || !reflect.DeepEqual(op.QueryParams[0], Param{Name: "from", Description: "start"}) || !reflect.DeepEqual(op.QueryParams[1], Param{Name: "to", Description: "end", Required: true, Type: "string"}) {
 		t.Errorf("query params = %+v", op.QueryParams)
+	}
+}
+
+func TestParseKeepsDocumentOrder(t *testing.T) {
+	const doc = `{"paths":{
+		"/things":{"post":{"operationId":"createThing"},"get":{"operationId":"listThings"}},
+		"/things/{id}":{"parameters":[],"patch":{"operationId":"updateThing"},"get":{"operationId":"getThing"},"delete":{"operationId":"deleteThing"}},
+		"/apps":{"get":{"operationId":"listApps"}}}}`
+	s, err := Parse([]byte(doc), "dev")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for _, op := range s.Operations {
+		ids = append(ids, op.ID)
+	}
+	want := []string{"createThing", "listThings", "updateThing", "getThing", "deleteThing", "listApps"}
+	if !reflect.DeepEqual(ids, want) {
+		t.Errorf("ids = %v, want %v", ids, want)
 	}
 }
 
