@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.5](https://github.com/judoscale/judoscale-cli/compare/v0.0.4...v0.0.5) (2026-11-05)
+
+
+### Features
+
+* add commands to pause and resume app autoscaling ([4877e77](https://github.com/judoscale/judoscale-cli/commit/4877e7793cd39a1f9f4ae9c14f16fa0ae2cf17b7))
+* list commands in the spec's operation order ([#7](https://github.com/judoscale/judoscale-cli/issues/7)) ([9250841](https://github.com/judoscale/judoscale-cli/commit/92508415dc242712bfacb44863f4c197245da1b3))
+
 ## [0.0.4](https://github.com/judoscale/judoscale-cli/compare/v0.0.3...v0.0.4) (2026-10-28)
 
 
