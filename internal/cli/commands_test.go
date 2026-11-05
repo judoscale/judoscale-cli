@@ -56,6 +56,21 @@ func TestCommandTreeSnapshot(t *testing.T) {
 	}
 }
 
+func TestCommandsFollowSpecOrder(t *testing.T) {
+	names := treeNames(t, `{"tags":[{"name":"API Tokens"}],"paths":{
+		"/v1/api_tokens":{
+			"get":{"operationId":"listApiTokens","tags":["API Tokens"]},
+			"post":{"operationId":"createApiToken","tags":["API Tokens"]}},
+		"/v1/api_tokens/{id}":{
+			"get":{"operationId":"getApiToken","tags":["API Tokens"]},
+			"patch":{"operationId":"updateApiToken","tags":["API Tokens"]},
+			"delete":{"operationId":"deleteApiToken","tags":["API Tokens"]}}}}`)
+	want := []string{"api-tokens list", "api-tokens create", "api-tokens get", "api-tokens update", "api-tokens delete"}
+	if !slices.Equal(names, want) {
+		t.Errorf("names = %v, want %v", names, want)
+	}
+}
+
 // TestEveryOperationRuns invokes each command in the snapshot and checks the
 // request it sends matches the operation's method and path.
 func TestEveryOperationRuns(t *testing.T) {

@@ -148,49 +148,6 @@
       }
     },
     "/v1/api_tokens/{id}": {
-      "delete": {
-        "operationId": "deleteApiToken",
-        "summary": "Delete an API token",
-        "description": "Revokes an API token. The token stops working immediately and no longer appears in the list.",
-        "tags": [
-          "API Tokens"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "The token was revoked."
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalServerError"
-          }
-        },
-        "security": [
-          {
-            "ApiToken": []
-          }
-        ]
-      },
       "get": {
         "operationId": "getApiToken",
         "summary": "Retrieve an API token",
@@ -309,6 +266,49 @@
             "ApiToken": []
           }
         ]
+      },
+      "delete": {
+        "operationId": "deleteApiToken",
+        "summary": "Delete an API token",
+        "description": "Revokes an API token. The token stops working immediately and no longer appears in the list.",
+        "tags": [
+          "API Tokens"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The token was revoked."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
       }
     },
     "/v1/apps": {
@@ -359,52 +359,6 @@
       }
     },
     "/v1/apps/{id}": {
-      "delete": {
-        "operationId": "deleteApp",
-        "summary": "Delete an app",
-        "description": "Unlinks the app from Judoscale. All autoscaling must be turned off first.",
-        "tags": [
-          "Apps"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "The app was unlinked."
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "422": {
-            "$ref": "#/components/responses/UnprocessableEntity"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalServerError"
-          }
-        },
-        "security": [
-          {
-            "ApiToken": []
-          }
-        ]
-      },
       "get": {
         "operationId": "getApp",
         "summary": "Retrieve an app",
@@ -522,13 +476,59 @@
             "ApiToken": []
           }
         ]
+      },
+      "delete": {
+        "operationId": "deleteApp",
+        "summary": "Delete an app",
+        "description": "Unlinks the app from Judoscale. All autoscaling must be turned off first.",
+        "tags": [
+          "Apps"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The app was unlinked."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
       }
     },
     "/v1/apps/{app_id}/maintenance": {
-      "delete": {
-        "operationId": "disableAppMaintenance",
-        "summary": "Disable maintenance mode",
-        "description": "Resumes autoscaling and restores workers to their previous scale.",
+      "post": {
+        "operationId": "enableAppMaintenance",
+        "summary": "Enable maintenance mode",
+        "description": "Stops Judoscale from managing the app's scale, such as during scheduled maintenance, without having to disable autoscaling for each process. Worker processes scale down to 0, and web processes are unchanged.",
         "tags": [
           "Apps"
         ],
@@ -544,7 +544,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Maintenance mode disabled for the app.",
+            "description": "Maintenance mode enabled for the app.",
             "content": {
               "application/json": {
                 "schema": {
@@ -609,10 +609,10 @@
           }
         ]
       },
-      "post": {
-        "operationId": "enableAppMaintenance",
-        "summary": "Enable maintenance mode",
-        "description": "Stops Judoscale from managing the app's scale, such as during scheduled maintenance, without having to disable autoscaling for each process. Worker processes scale down to 0, and web processes are unchanged.",
+      "delete": {
+        "operationId": "disableAppMaintenance",
+        "summary": "Disable maintenance mode",
+        "description": "Resumes autoscaling and restores workers to their previous scale.",
         "tags": [
           "Apps"
         ],
@@ -628,7 +628,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Maintenance mode enabled for the app.",
+            "description": "Maintenance mode disabled for the app.",
             "content": {
               "application/json": {
                 "schema": {
@@ -870,52 +870,6 @@
       }
     },
     "/v1/memberships/{id}": {
-      "delete": {
-        "operationId": "deleteMembership",
-        "summary": "Delete a membership",
-        "description": "Removes a member from the team.",
-        "tags": [
-          "Memberships"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "The member was removed."
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "422": {
-            "$ref": "#/components/responses/UnprocessableEntity"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalServerError"
-          }
-        },
-        "security": [
-          {
-            "ApiToken": []
-          }
-        ]
-      },
       "get": {
         "operationId": "getMembership",
         "summary": "Retrieve a membership",
@@ -1013,6 +967,52 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteMembership",
+        "summary": "Delete a membership",
+        "description": "Removes a member from the team.",
+        "tags": [
+          "Memberships"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The member was removed."
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -1773,7 +1773,7 @@
       "get": {
         "operationId": "listProcessScaleEvents",
         "summary": "List a process's scale events",
-        "description": "The process's scaling events, newest first. Events are kept for 4 months.",
+        "description": "The process's scaling events, newest first. Events are kept for 12 months.",
         "tags": [
           "Process Scale Events"
         ],
@@ -1864,52 +1864,6 @@
       }
     },
     "/v1/processes/{process_id}/schedule": {
-      "delete": {
-        "operationId": "deleteProcessSchedule",
-        "summary": "Delete a process's schedule",
-        "description": "Deletes the entire process's schedule.",
-        "tags": [
-          "Process Schedule"
-        ],
-        "parameters": [
-          {
-            "name": "process_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "The process's schedule was deleted."
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "422": {
-            "$ref": "#/components/responses/UnprocessableEntity"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalServerError"
-          }
-        },
-        "security": [
-          {
-            "ApiToken": []
-          }
-        ]
-      },
       "get": {
         "operationId": "getProcessSchedule",
         "summary": "Retrieve a process's schedule",
@@ -2159,6 +2113,52 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteProcessSchedule",
+        "summary": "Delete a process's schedule",
+        "description": "Deletes the entire process's schedule.",
+        "tags": [
+          "Process Schedule"
+        ],
+        "parameters": [
+          {
+            "name": "process_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The process's schedule was deleted."
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"

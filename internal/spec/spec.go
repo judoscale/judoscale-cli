@@ -2,6 +2,7 @@
 package spec
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -128,9 +129,9 @@ type rawOperation struct {
 }
 
 type rawSpec struct {
-	MinCLIVersion string `json:"x-min-cli-version"`
-	Paths         map[string]map[string]json.RawMessage
-	Tags          []Tag `json:"tags"`
+	MinCLIVersion string          `json:"x-min-cli-version"`
+	Paths         json.RawMessage `json:"paths"`
+	Tags          []Tag           `json:"tags"`
 	Components    struct {
 		Parameters map[string]rawParam  `json:"parameters"`
 		Schemas    map[string]rawSchema `json:"schemas"`
@@ -140,8 +141,8 @@ type rawSpec struct {
 var httpMethods = []string{"get", "put", "post", "delete", "options", "head", "patch", "trace"}
 var pathVar = regexp.MustCompile(`\{([^}]+)\}`)
 
-// Parse reads an OpenAPI JSON document. Operations without an operationId are
-// skipped. cliVersion is checked against x-min-cli-version ("dev" skips it).
+// Parse reads an OpenAPI JSON document, keeping operations in document order.
+// Operations without an operationId are skipped. cliVersion is checked against x-min-cli-version ("dev" skips it).
 func Parse(data []byte, cliVersion string) (*Spec, error) {
 	var raw rawSpec
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -154,20 +155,31 @@ func Parse(data []byte, cliVersion string) (*Spec, error) {
 	s := &Spec{}
 	s.Tags = raw.Tags
 	seen := map[string]bool{}
-	for path, item := range raw.Paths {
+	paths, err := orderedObject(raw.Paths)
+	if err != nil {
+		return nil, fmt.Errorf("invalid paths: %w", err)
+	}
+	for _, p := range paths {
+		path := p.key
+		item, err := orderedObject(p.value)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
 		var shared []rawParam
-		if b, ok := item["parameters"]; ok {
-			if err := json.Unmarshal(b, &shared); err != nil {
-				return nil, fmt.Errorf("%s: invalid parameters: %w", path, err)
+		for _, f := range item {
+			if f.key == "parameters" {
+				if err := json.Unmarshal(f.value, &shared); err != nil {
+					return nil, fmt.Errorf("%s: invalid parameters: %w", path, err)
+				}
 			}
 		}
-		for _, m := range httpMethods {
-			b, ok := item[m]
-			if !ok {
+		for _, f := range item {
+			m := f.key
+			if !slices.Contains(httpMethods, m) {
 				continue
 			}
 			var op rawOperation
-			if err := json.Unmarshal(b, &op); err != nil {
+			if err := json.Unmarshal(f.value, &op); err != nil {
 				return nil, fmt.Errorf("%s %s: %w", strings.ToUpper(m), path, err)
 			}
 			if op.OperationID == "" {
@@ -180,8 +192,47 @@ func Parse(data []byte, cliVersion string) (*Spec, error) {
 			s.Operations = append(s.Operations, buildOperation(op, strings.ToUpper(m), path, shared, raw))
 		}
 	}
-	sort.Slice(s.Operations, func(i, j int) bool { return s.Operations[i].ID < s.Operations[j].ID })
 	return s, nil
+}
+
+type field struct {
+	key   string
+	value json.RawMessage
+}
+
+// orderedObject returns a JSON object's fields in document order. A repeated
+// key keeps its first position and last value, as json.Unmarshal would.
+// null or absent is an empty object.
+func orderedObject(data json.RawMessage) ([]field, error) {
+	if len(data) == 0 || string(data) == "null" {
+		return nil, nil
+	}
+	dec := json.NewDecoder(bytes.NewReader(data))
+	if tok, err := dec.Token(); err != nil {
+		return nil, err
+	} else if tok != json.Delim('{') {
+		return nil, errors.New("expected an object")
+	}
+	var fields []field
+	index := map[string]int{}
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return nil, err
+		}
+		key := tok.(string)
+		var value json.RawMessage
+		if err := dec.Decode(&value); err != nil {
+			return nil, err
+		}
+		if i, ok := index[key]; ok {
+			fields[i].value = value
+			continue
+		}
+		index[key] = len(fields)
+		fields = append(fields, field{key, value})
+	}
+	return fields, nil
 }
 
 func buildOperation(op rawOperation, method, path string, shared []rawParam, raw rawSpec) Operation {

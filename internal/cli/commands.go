@@ -24,7 +24,7 @@ func (c command) fullName() string { return c.group + " " + c.name }
 
 // commandTree groups the spec's operations into resources, named from their
 // tags, in the spec's tag order (undeclared tags follow alphabetically, then
-// untagged operations under "other").
+// untagged operations under "other"). Commands keep the spec's operation order.
 //
 // The group drops a leading parent word taken from the path ("Process
 // Schedule" on /processes/{process_id}/schedule is "schedule"), and the
@@ -120,7 +120,6 @@ func commandTree(s *spec.Spec) []group {
 		for _, e := range es {
 			cmds = append(cmds, command{group: g, name: e.name, op: e.op})
 		}
-		sort.Slice(cmds, func(i, j int) bool { return cmds[i].name < cmds[j].name })
 		groups = append(groups, group{name: g, description: descriptions[g], commands: cmds})
 	}
 	return groups
