@@ -137,6 +137,7 @@ func buildRequest(op spec.Operation, pathValues, queryValues map[string]string) 
 // notDestructive lists DELETE operations that don't need --yes.
 var notDestructive = map[string]bool{
 	"disableAppMaintenance": true,
+	"resumeAppAutoscaling":  true,
 }
 
 // destructive reports whether op needs --yes to run.

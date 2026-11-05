@@ -148,6 +148,9 @@ func TestDeleteNeedsYes(t *testing.T) {
 	if res := run(t, srv, nil, "", "apps", "disable-maintenance", "1"); res.code != 0 || calls != 2 {
 		t.Errorf("disable-maintenance:%+v (calls %d)", res, calls)
 	}
+	if res := run(t, srv, nil, "", "apps", "resume-autoscaling", "1"); res.code != 0 || calls != 3 {
+		t.Errorf("resume-autoscaling: %+v (calls %d)", res, calls)
+	}
 	if res := run(t, nil, nil, "", "apps", "delete", "--help"); !strings.Contains(res.stdout, "--yes") {
 		t.Errorf("help: %s", res.stdout)
 	}
