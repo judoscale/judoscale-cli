@@ -524,6 +524,172 @@
         ]
       }
     },
+    "/v1/apps/{app_id}/autoscaling_pause": {
+      "post": {
+        "operationId": "pauseAppAutoscaling",
+        "summary": "Pause autoscaling",
+        "description": "Stops autoscaling for all of the app's processes, without changing their scale. Send a `duration` or an `until` time to resume automatically, or neither to stay paused until resumed. Pausing an app that's already paused replaces its end time.",
+        "tags": [
+          "Apps"
+        ],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "duration": {
+                    "description": "How long to pause, as an ISO 8601 duration, such as `PT30M` or `P2W`.",
+                    "type": "string"
+                  },
+                  "until": {
+                    "description": "When to resume, as an ISO 8601 timestamp. Must be in the future.",
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Autoscaling paused for the app.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "autoscaling_paused_at": {
+                      "description": "When autoscaling was paused.",
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "autoscaling_paused_until": {
+                      "description": "When autoscaling resumes, or null if it stays paused until resumed.",
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "autoscaling_paused_at",
+                    "autoscaling_paused_until"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "resumeAppAutoscaling",
+        "summary": "Resume autoscaling",
+        "description": "Resumes autoscaling for an app that's paused.",
+        "tags": [
+          "Apps"
+        ],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Autoscaling resumed for the app.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "autoscaling_paused_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "autoscaling_paused_until": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "autoscaling_paused_at",
+                    "autoscaling_paused_until"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
     "/v1/apps/{app_id}/maintenance": {
       "post": {
         "operationId": "enableAppMaintenance",
@@ -2416,6 +2582,22 @@
           "subscription": {
             "description": "The add-on subscription for this app. Null when Judoscale bills the team directly, in which case the subscription belongs to the team instead.",
             "$ref": "#/components/schemas/Subscription"
+          },
+          "autoscaling_paused_at": {
+            "description": "When autoscaling was paused, or null if it's not paused.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "autoscaling_paused_until": {
+            "description": "When a paused app resumes autoscaling, or null if it stays paused until resumed.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         },
         "required": [
