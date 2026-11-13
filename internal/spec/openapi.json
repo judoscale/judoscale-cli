@@ -605,6 +605,12 @@
           "403": {
             "$ref": "#/components/responses/Forbidden"
           },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
           "429": {
             "$ref": "#/components/responses/RateLimited"
           },
@@ -675,6 +681,12 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
@@ -2169,7 +2181,7 @@
                           "type": "integer"
                         },
                         "time": {
-                          "description": "Time of day the entry starts, in `HH:MM`, in the process's `schedule_time_zone`.",
+                          "description": "Time of day the entry starts, in `HH:MM` from `00:00` to `23:59`, in the process's `schedule_time_zone`.",
                           "type": "string"
                         },
                         "min_scale": {
@@ -2232,7 +2244,7 @@
                           "type": "integer"
                         },
                         "time": {
-                          "description": "Time of day the entry starts, in `HH:MM`, in the process's `schedule_time_zone`.",
+                          "description": "Time of day the entry starts, in `HH:MM` from `00:00` to `23:59`, in the process's `schedule_time_zone`.",
                           "type": "string"
                         },
                         "min_scale": {
@@ -3126,7 +3138,7 @@
             "type": "integer"
           },
           "time": {
-            "description": "Time of day the entry starts, in `HH:MM`, in the process's `schedule_time_zone`.",
+            "description": "Time of day the entry starts, in `HH:MM` from `00:00` to `23:59`, in the process's `schedule_time_zone`.",
             "type": "string"
           },
           "min_scale": {
