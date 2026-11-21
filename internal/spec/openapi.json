@@ -605,6 +605,12 @@
           "403": {
             "$ref": "#/components/responses/Forbidden"
           },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
           "429": {
             "$ref": "#/components/responses/RateLimited"
           },
@@ -675,6 +681,12 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
@@ -2029,6 +2041,182 @@
         ]
       }
     },
+    "/v1/processes/{process_id}/scale_override": {
+      "post": {
+        "operationId": "overrideProcessScale",
+        "summary": "Override a process's scale",
+        "description": "Temporarily replaces the process's scale range, such as ahead of expected traffic. The override can\nexceed your plan limits. Send a `min_scale`, a `max_scale`, or both, and a `duration` or an `until`\ntime, up to a day ahead.\n\nOverriding a process that's already overridden updates it with the limits and end time you send. When\nit ends, the process goes back to its scale from before the first override, or to the current schedule\nentry if any.",
+        "tags": [
+          "Processes"
+        ],
+        "parameters": [
+          {
+            "name": "process_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "min_scale": {
+                    "description": "The overridden floor of the scale range, in instances.",
+                    "type": "integer"
+                  },
+                  "max_scale": {
+                    "description": "The overridden ceiling of the scale range, in instances.",
+                    "type": "integer"
+                  },
+                  "duration": {
+                    "description": "How long to override, as an ISO 8601 duration, such as `PT30M` or `PT4H`.",
+                    "type": "string"
+                  },
+                  "until": {
+                    "description": "When the override ends, as an ISO 8601 timestamp.",
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The process's overridden scale range.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "min_scale": {
+                      "description": "The process's current floor, in instances.",
+                      "type": "integer"
+                    },
+                    "max_scale": {
+                      "description": "The process's current ceiling, in instances.",
+                      "type": "integer"
+                    },
+                    "scale_override": {
+                      "description": "The active override.",
+                      "$ref": "#/components/schemas/ScaleOverride"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "min_scale",
+                    "max_scale",
+                    "scale_override"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "endProcessScaleOverride",
+        "summary": "End a process's scale override",
+        "description": "Ends the override now, going back to the process's previous scale, or to the current schedule entry if any. Ending the override on a process that isn't overridden does nothing.",
+        "tags": [
+          "Processes"
+        ],
+        "parameters": [
+          {
+            "name": "process_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The process's scale range after the override ended.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "min_scale": {
+                      "type": "integer"
+                    },
+                    "max_scale": {
+                      "type": "integer"
+                    },
+                    "scale_override": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "min_scale",
+                    "max_scale",
+                    "scale_override"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
     "/v1/processes/{process_id}/schedule": {
       "get": {
         "operationId": "getProcessSchedule",
@@ -2169,7 +2357,7 @@
                           "type": "integer"
                         },
                         "time": {
-                          "description": "Time of day the entry starts, in `HH:MM`, in the process's `schedule_time_zone`.",
+                          "description": "Time of day the entry starts, in `HH:MM` from `00:00` to `23:59`, in the process's `schedule_time_zone`.",
                           "type": "string"
                         },
                         "min_scale": {
@@ -2232,7 +2420,7 @@
                           "type": "integer"
                         },
                         "time": {
-                          "description": "Time of day the entry starts, in `HH:MM`, in the process's `schedule_time_zone`.",
+                          "description": "Time of day the entry starts, in `HH:MM` from `00:00` to `23:59`, in the process's `schedule_time_zone`.",
                           "type": "string"
                         },
                         "min_scale": {
@@ -3021,6 +3209,10 @@
             "items": {
               "type": "string"
             }
+          },
+          "scale_override": {
+            "description": "The active temporary scale override, or null when there's none.",
+            "$ref": "#/components/schemas/ScaleOverride"
           }
         },
         "required": [
@@ -3032,6 +3224,7 @@
           "current_scale",
           "min_scale",
           "max_scale",
+          "scale_override",
           "upscale_quantity",
           "upscale_interval_seconds",
           "upscale_sensitivity_seconds",
@@ -3114,6 +3307,39 @@
           "source"
         ]
       },
+      "ScaleOverride": {
+        "description": "A temporary scale range on a process. While it lasts, the process's `min_scale` and `max_scale` hold the overridden range and can't be changed directly, and its schedule doesn't apply.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "starts_at": {
+            "description": "When the override started. Overriding again keeps it.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends_at": {
+            "description": "When the override ends. The process then goes back to its previous scale, or to the current schedule entry if any.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "previous_min_scale": {
+            "description": "The floor before the override. Without a schedule, the process goes back to it when the override ends.",
+            "type": "integer"
+          },
+          "previous_max_scale": {
+            "description": "The ceiling before the override. Without a schedule, the process goes back to it when the override ends.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "starts_at",
+          "ends_at",
+          "previous_min_scale",
+          "previous_max_scale"
+        ]
+      },
       "ScheduleEntry": {
         "description": "A day, time, and scale for a process to autoscale on.",
         "type": "object",
@@ -3126,7 +3352,7 @@
             "type": "integer"
           },
           "time": {
-            "description": "Time of day the entry starts, in `HH:MM`, in the process's `schedule_time_zone`.",
+            "description": "Time of day the entry starts, in `HH:MM` from `00:00` to `23:59`, in the process's `schedule_time_zone`.",
             "type": "string"
           },
           "min_scale": {
