@@ -131,6 +131,25 @@ func TestParseOptionalBodyFieldsAreNotRequired(t *testing.T) {
 	}
 }
 
+func TestParseDestructive(t *testing.T) {
+	const doc = `{"paths":{
+		"/a":{"post":{"operationId":"purgeA","x-destructive":true},"delete":{"operationId":"endA","x-destructive":false}},
+		"/b":{"get":{"operationId":"getB"},"patch":{"operationId":"updateB"},"delete":{"operationId":"deleteB"}}}}`
+	s, err := Parse([]byte(doc), "dev")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, op := range s.Operations {
+		got[op.ID] = op.Destructive
+	}
+	// Without x-destructive, as in specs from before it, only a DELETE is destructive.
+	want := map[string]bool{"purgeA": true, "endA": false, "getB": false, "updateB": false, "deleteB": true}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("destructive = %v, want %v", got, want)
+	}
+}
+
 func TestParseDuplicateOperationID(t *testing.T) {
 	data := `{"paths":{"/a":{"get":{"operationId":"x"}},"/b":{"get":{"operationId":"x"}}}}`
 	if _, err := Parse([]byte(data), "dev"); err == nil || !strings.Contains(err.Error(), "duplicate") {

@@ -58,6 +58,9 @@ type Operation struct {
 	QueryParams []Param
 	// BodyParams are the top-level properties of the JSON request body.
 	BodyParams []Param
+	// Destructive is the operation's x-destructive. Specs from before it
+	// existed don't declare it, so every DELETE counts as destructive there.
+	Destructive bool
 }
 
 type Param struct {
@@ -121,6 +124,7 @@ type rawOperation struct {
 	Tags        []string   `json:"tags"`
 	Summary     string     `json:"summary"`
 	Description string     `json:"description"`
+	Destructive *bool      `json:"x-destructive"`
 	Parameters  []rawParam `json:"parameters"`
 	RequestBody struct {
 		Required bool `json:"required"`
@@ -241,6 +245,11 @@ func buildOperation(op rawOperation, method, path string, shared []rawParam, raw
 	o := Operation{ID: op.OperationID, Method: method, Path: path, Summary: op.Summary, Description: op.Description}
 	if len(op.Tags) > 0 {
 		o.Tag = op.Tags[0]
+	}
+	if op.Destructive != nil {
+		o.Destructive = *op.Destructive
+	} else {
+		o.Destructive = method == http.MethodDelete
 	}
 
 	byKey := map[string]rawParam{}
