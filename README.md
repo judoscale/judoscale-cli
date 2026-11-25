@@ -109,7 +109,7 @@ Use the `judo` CLI for the Judoscale API. Output is JSON.
 
 ### API spec
 
-The binary embeds a snapshot of the spec. `judo update` downloads the latest spec from the Judoscale API to `~/.config/judoscale/openapi.json` (or `$XDG_CONFIG_HOME/judoscale/`, `%AppData%\judoscale\` on Windows), and that copy overrides the snapshot. The CLI never updates it on its own. If the latest spec needs a newer CLI, `judo update` asks you to upgrade instead.
+The binary embeds a snapshot of the spec. `judo update` downloads the latest spec from the Judoscale API to `~/.config/judoscale/openapi.json` (or `$XDG_CONFIG_HOME/judoscale/`, `%AppData%\judoscale\` on Windows), and that copy overrides the snapshot. The CLI never updates it on its own, but a newer CLI release discards a spec cached by an older one and uses its own snapshot until you run `judo update` again. If the latest spec needs a newer CLI, `judo update` asks you to upgrade instead.
 
 ### Updates
 
