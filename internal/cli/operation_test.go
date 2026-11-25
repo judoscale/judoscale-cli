@@ -151,8 +151,8 @@ func TestDeleteNeedsYes(t *testing.T) {
 	if res := run(t, srv, nil, "", "apps", "resume-autoscaling", "1"); res.code != 0 || calls != 3 {
 		t.Errorf("resume-autoscaling: %+v (calls %d)", res, calls)
 	}
-	if res := run(t, srv, nil, "", "processes", "end-scale-override", "1"); res.code != 0 || calls != 4 {
-		t.Errorf("end-scale-override: %+v (calls %d)", res, calls)
+	if res := run(t, srv, nil, "", "processes", "remove-scale-override", "1"); res.code != 0 || calls != 4 {
+		t.Errorf("remove-scale-override: %+v (calls %d)", res, calls)
 	}
 	// Accepted anyway, in case a script passed it before the operation stopped being destructive.
 	if res := run(t, srv, nil, "", "apps", "disable-maintenance", "1", "--yes"); res.code != 0 || calls != 5 {

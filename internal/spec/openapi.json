@@ -2057,9 +2057,9 @@
     },
     "/v1/processes/{process_id}/scale_override": {
       "post": {
-        "operationId": "overrideProcessScale",
+        "operationId": "setProcessScaleOverride",
         "x-destructive": false,
-        "summary": "Override a process's scale",
+        "summary": "Set a scale override",
         "description": "Temporarily replaces the process's scale range, such as ahead of expected traffic. The override can\nexceed your plan limits. Send a `min_scale`, a `max_scale`, or both, and a `duration` or an `until`\ntime, up to a day ahead.\n\nOverriding a process that's already overridden updates it with the limits and end time you send. When\nit ends, the process goes back to its scale from before the first override, or to the current schedule\nentry if any.",
         "tags": [
           "Processes"
@@ -2162,10 +2162,10 @@
         ]
       },
       "delete": {
-        "operationId": "endProcessScaleOverride",
+        "operationId": "removeProcessScaleOverride",
         "x-destructive": false,
-        "summary": "End a process's scale override",
-        "description": "Ends the override now, going back to the process's previous scale, or to the current schedule entry if any. Ending the override on a process that isn't overridden does nothing.",
+        "summary": "Remove a scale override",
+        "description": "Ends the override now, going back to the process's previous scale, or to the current schedule entry if any. Removing the override on a process that isn't overridden does nothing.",
         "tags": [
           "Processes"
         ],
