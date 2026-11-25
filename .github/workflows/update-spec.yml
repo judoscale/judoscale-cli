@@ -40,8 +40,10 @@ jobs:
           git push --force origin "$branch"
 
           body='Refreshed with `script/update-spec`.'
-          if gh pr view "$branch" >/dev/null 2>&1; then
-            gh pr edit "$branch" --body "$body"
+          # gh pr view "$branch" would also match merged PRs from this branch.
+          pr=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number')
+          if [ -n "$pr" ]; then
+            gh pr edit "$pr" --body "$body"
           else
             gh pr create --head "$branch" --body "$body" \
               --title "fix: update the embedded API spec"
