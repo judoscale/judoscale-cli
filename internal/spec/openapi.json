@@ -59,6 +59,7 @@
       },
       "post": {
         "operationId": "createApiToken",
+        "x-destructive": false,
         "summary": "Create an API token",
         "description": "Creates an API token, returning the plain token for use with the API. It cannot be fetched again afterwards.",
         "tags": [
@@ -197,6 +198,7 @@
       },
       "patch": {
         "operationId": "updateApiToken",
+        "x-destructive": false,
         "summary": "Update an API token",
         "description": "Updates an API token. Role and read-only access cannot be changed once it's created.",
         "responses": {
@@ -269,6 +271,7 @@
       },
       "delete": {
         "operationId": "deleteApiToken",
+        "x-destructive": true,
         "summary": "Delete an API token",
         "description": "Revokes an API token. The token stops working immediately and no longer appears in the list.",
         "tags": [
@@ -408,6 +411,7 @@
       },
       "patch": {
         "operationId": "updateApp",
+        "x-destructive": false,
         "summary": "Update an app",
         "description": "Updates an app.",
         "tags": [
@@ -479,6 +483,7 @@
       },
       "delete": {
         "operationId": "deleteApp",
+        "x-destructive": true,
         "summary": "Delete an app",
         "description": "Unlinks the app from Judoscale. All autoscaling must be turned off first.",
         "tags": [
@@ -527,6 +532,7 @@
     "/v1/apps/{app_id}/autoscaling_pause": {
       "post": {
         "operationId": "pauseAppAutoscaling",
+        "x-destructive": false,
         "summary": "Pause autoscaling",
         "description": "Stops autoscaling for all of the app's processes, without changing their scale. Send a `duration` or an `until` time to resume automatically, or neither to stay paused until resumed. Pausing an app that's already paused replaces its end time.",
         "tags": [
@@ -605,6 +611,12 @@
           "403": {
             "$ref": "#/components/responses/Forbidden"
           },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
           "429": {
             "$ref": "#/components/responses/RateLimited"
           },
@@ -620,6 +632,7 @@
       },
       "delete": {
         "operationId": "resumeAppAutoscaling",
+        "x-destructive": false,
         "summary": "Resume autoscaling",
         "description": "Resumes autoscaling for an app that's paused.",
         "tags": [
@@ -676,6 +689,12 @@
           "403": {
             "$ref": "#/components/responses/Forbidden"
           },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
           "429": {
             "$ref": "#/components/responses/RateLimited"
           },
@@ -693,6 +712,7 @@
     "/v1/apps/{app_id}/maintenance": {
       "post": {
         "operationId": "enableAppMaintenance",
+        "x-destructive": false,
         "summary": "Enable maintenance mode",
         "description": "Stops Judoscale from managing the app's scale, such as during scheduled maintenance, without having to disable autoscaling for each process. Worker processes scale down to 0, and web processes are unchanged.",
         "tags": [
@@ -777,6 +797,7 @@
       },
       "delete": {
         "operationId": "disableAppMaintenance",
+        "x-destructive": false,
         "summary": "Disable maintenance mode",
         "description": "Resumes autoscaling and restores workers to their previous scale.",
         "tags": [
@@ -968,6 +989,7 @@
       },
       "post": {
         "operationId": "createMembership",
+        "x-destructive": false,
         "summary": "Create a membership",
         "description": "Adds a member to the team, inviting them by email if they don't have a Judoscale account yet.",
         "tags": [
@@ -1085,6 +1107,7 @@
       },
       "patch": {
         "operationId": "updateMembership",
+        "x-destructive": false,
         "summary": "Update a membership",
         "description": "Updates a membership. Email cannot be changed.",
         "tags": [
@@ -1161,6 +1184,7 @@
       },
       "delete": {
         "operationId": "deleteMembership",
+        "x-destructive": true,
         "summary": "Delete a membership",
         "description": "Removes a member from the team.",
         "tags": [
@@ -1256,6 +1280,7 @@
       },
       "patch": {
         "operationId": "updateProcess",
+        "x-destructive": false,
         "summary": "Update a process",
         "description": "Updates a process's autoscaling settings.",
         "tags": [
@@ -1443,6 +1468,7 @@
       },
       "patch": {
         "operationId": "updateProcessAutoscaleMetrics",
+        "x-destructive": false,
         "summary": "Update a process's autoscale metrics",
         "description": "Sets which metrics drive this process's autoscaling. What you send becomes the enabled set, so\nanything left out is disabled and at least one metric is required. Thresholds are set on the\nprocess itself.\n\nSwitching to `scaling_schedule` seeds a default schedule for a process that has none, which can\nbe managed through its schedule.\n\nSwitching to `response_time`, where available, creates the log drain that ingests response times\nfrom your application logs.",
         "tags": [
@@ -2029,6 +2055,184 @@
         ]
       }
     },
+    "/v1/processes/{process_id}/scale_override": {
+      "post": {
+        "operationId": "overrideProcessScale",
+        "x-destructive": false,
+        "summary": "Override a process's scale",
+        "description": "Temporarily replaces the process's scale range, such as ahead of expected traffic. The override can\nexceed your plan limits. Send a `min_scale`, a `max_scale`, or both, and a `duration` or an `until`\ntime, up to a day ahead.\n\nOverriding a process that's already overridden updates it with the limits and end time you send. When\nit ends, the process goes back to its scale from before the first override, or to the current schedule\nentry if any.",
+        "tags": [
+          "Processes"
+        ],
+        "parameters": [
+          {
+            "name": "process_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "min_scale": {
+                    "description": "The overridden floor of the scale range, in instances.",
+                    "type": "integer"
+                  },
+                  "max_scale": {
+                    "description": "The overridden ceiling of the scale range, in instances.",
+                    "type": "integer"
+                  },
+                  "duration": {
+                    "description": "How long to override, as an ISO 8601 duration, such as `PT30M` or `PT4H`.",
+                    "type": "string"
+                  },
+                  "until": {
+                    "description": "When the override ends, as an ISO 8601 timestamp.",
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The process's overridden scale range.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "min_scale": {
+                      "description": "The process's current floor, in instances.",
+                      "type": "integer"
+                    },
+                    "max_scale": {
+                      "description": "The process's current ceiling, in instances.",
+                      "type": "integer"
+                    },
+                    "scale_override": {
+                      "description": "The active override.",
+                      "$ref": "#/components/schemas/ScaleOverride"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "min_scale",
+                    "max_scale",
+                    "scale_override"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "endProcessScaleOverride",
+        "x-destructive": false,
+        "summary": "End a process's scale override",
+        "description": "Ends the override now, going back to the process's previous scale, or to the current schedule entry if any. Ending the override on a process that isn't overridden does nothing.",
+        "tags": [
+          "Processes"
+        ],
+        "parameters": [
+          {
+            "name": "process_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The process's scale range after the override ended.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "min_scale": {
+                      "type": "integer"
+                    },
+                    "max_scale": {
+                      "type": "integer"
+                    },
+                    "scale_override": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "min_scale",
+                    "max_scale",
+                    "scale_override"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "security": [
+          {
+            "ApiToken": []
+          }
+        ]
+      }
+    },
     "/v1/processes/{process_id}/schedule": {
       "get": {
         "operationId": "getProcessSchedule",
@@ -2090,6 +2294,7 @@
       },
       "post": {
         "operationId": "createProcessSchedule",
+        "x-destructive": false,
         "summary": "Create a process's schedule",
         "description": "Creates the process's schedule. Omit the body to bootstrap a default one. An empty list is rejected, since a schedule needs at least one entry.",
         "tags": [
@@ -2169,7 +2374,7 @@
                           "type": "integer"
                         },
                         "time": {
-                          "description": "Time of day the entry starts, in `HH:MM`, in the process's `schedule_time_zone`.",
+                          "description": "Time of day the entry starts, in `HH:MM` from `00:00` to `23:59`, in the process's `schedule_time_zone`.",
                           "type": "string"
                         },
                         "min_scale": {
@@ -2200,6 +2405,7 @@
       },
       "put": {
         "operationId": "updateProcessSchedule",
+        "x-destructive": false,
         "summary": "Update a process's schedule",
         "description": "Replaces the process's schedule: an entry with a matching id is updated, one without an id is created (and must give every field the same way create does), and any left out of the list are deleted.",
         "tags": [
@@ -2232,7 +2438,7 @@
                           "type": "integer"
                         },
                         "time": {
-                          "description": "Time of day the entry starts, in `HH:MM`, in the process's `schedule_time_zone`.",
+                          "description": "Time of day the entry starts, in `HH:MM` from `00:00` to `23:59`, in the process's `schedule_time_zone`.",
                           "type": "string"
                         },
                         "min_scale": {
@@ -2307,6 +2513,7 @@
       },
       "delete": {
         "operationId": "deleteProcessSchedule",
+        "x-destructive": true,
         "summary": "Delete a process's schedule",
         "description": "Deletes the entire process's schedule.",
         "tags": [
@@ -2389,6 +2596,7 @@
       },
       "patch": {
         "operationId": "updateTeam",
+        "x-destructive": false,
         "summary": "Update the team",
         "description": "Updates the team's settings.",
         "tags": [
@@ -3021,6 +3229,10 @@
             "items": {
               "type": "string"
             }
+          },
+          "scale_override": {
+            "description": "The active temporary scale override, or null when there's none.",
+            "$ref": "#/components/schemas/ScaleOverride"
           }
         },
         "required": [
@@ -3032,6 +3244,7 @@
           "current_scale",
           "min_scale",
           "max_scale",
+          "scale_override",
           "upscale_quantity",
           "upscale_interval_seconds",
           "upscale_sensitivity_seconds",
@@ -3114,6 +3327,39 @@
           "source"
         ]
       },
+      "ScaleOverride": {
+        "description": "A temporary scale range on a process. While it lasts, the process's `min_scale` and `max_scale` hold the overridden range and can't be changed directly, and its schedule doesn't apply.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "starts_at": {
+            "description": "When the override started. Overriding again keeps it.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends_at": {
+            "description": "When the override ends. The process then goes back to its previous scale, or to the current schedule entry if any.",
+            "type": "string",
+            "format": "date-time"
+          },
+          "previous_min_scale": {
+            "description": "The floor before the override. Without a schedule, the process goes back to it when the override ends.",
+            "type": "integer"
+          },
+          "previous_max_scale": {
+            "description": "The ceiling before the override. Without a schedule, the process goes back to it when the override ends.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "starts_at",
+          "ends_at",
+          "previous_min_scale",
+          "previous_max_scale"
+        ]
+      },
       "ScheduleEntry": {
         "description": "A day, time, and scale for a process to autoscale on.",
         "type": "object",
@@ -3126,7 +3372,7 @@
             "type": "integer"
           },
           "time": {
-            "description": "Time of day the entry starts, in `HH:MM`, in the process's `schedule_time_zone`.",
+            "description": "Time of day the entry starts, in `HH:MM` from `00:00` to `23:59`, in the process's `schedule_time_zone`.",
             "type": "string"
           },
           "min_scale": {
