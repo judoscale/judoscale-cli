@@ -29,10 +29,9 @@ func (a *App) runOperation(ctx context.Context, cmd command, args []string) erro
 	if _, paginated := query["cursor"]; paginated {
 		all = fs.Bool("all", false, "")
 	}
-	var yes *bool
-	if destructive(op) {
-		yes = fs.Bool("yes", false, "")
-	}
+	// Accepted everywhere, so scripts keep working when the spec changes
+	// whether an operation is destructive.
+	yes := fs.Bool("yes", false, "")
 	dryRun := fs.Bool("dry-run", false, "")
 	var data *string
 	if hasBody(op) {
@@ -76,7 +75,7 @@ func (a *App) runOperation(ctx context.Context, cmd command, args []string) erro
 	}
 
 	dry := *dryRun
-	if yes != nil && !*yes && !dry {
+	if op.Destructive && !*yes && !dry {
 		return usagef("%s is destructive; pass --yes to confirm", cmd.fullName())
 	}
 
@@ -132,17 +131,6 @@ func buildRequest(op spec.Operation, pathValues, queryValues map[string]string) 
 		q.Set(p.Name, v)
 	}
 	return path, q, ""
-}
-
-// notDestructive lists DELETE operations that don't need --yes.
-var notDestructive = map[string]bool{
-	"disableAppMaintenance": true,
-	"resumeAppAutoscaling":  true,
-}
-
-// destructive reports whether op needs --yes to run.
-func destructive(op spec.Operation) bool {
-	return op.Method == http.MethodDelete && !notDestructive[op.ID]
 }
 
 func hasBody(op spec.Operation) bool {
@@ -269,7 +257,7 @@ func (a *App) operationHelp(cmd command, paginated bool) {
 	if hasBody(op) {
 		fmt.Fprintln(tw, "  -d, --data string\tJSON request body instead of field flags; use - to read it from stdin")
 	}
-	if destructive(op) {
+	if op.Destructive {
 		fmt.Fprintln(tw, "  --yes\tConfirm this destructive action (required)")
 	}
 	fmt.Fprintln(tw, "  --dry-run\tPrint the request instead of sending it")

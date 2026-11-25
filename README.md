@@ -72,7 +72,7 @@ Commands are built from the Judoscale API's OpenAPI spec. They are grouped by re
 
 Request body fields are flags. Boolean flags are set with `--name` or `--name=false`, and array or object fields take a JSON value. Pass `-d`/`--data` to send a whole JSON body instead (`--data -` reads it from stdin).
 
-Destructive commands, like `judo apps delete 123`, refuse to run without `--yes`. `judo api` never asks.
+Destructive commands, like `judo apps delete 123`, refuse to run without `--yes`. The API's spec marks which ones are, and their `--help` lists the flag; other commands accept `--yes` and ignore it. `judo api` never asks.
 
 Add `--dry-run` to preview any command, including `judo api`. It prints the method, URL, headers (with the token masked) and the JSON body.
 
@@ -96,7 +96,7 @@ To point an agent at the CLI, add something like this to its instructions (`AGEN
 Use the `judo` CLI for the Judoscale API. Output is JSON.
 
 - `judo help` lists resources, and `judo <resource> <command> --help` shows a command's flags.
-- Preview a change with `--dry-run` first. Deletes need `--yes`.
+- Preview a change with `--dry-run` first. Destructive commands need `--yes`, which their `--help` lists.
 - Use `--all` on list commands to follow pagination.
 ```
 

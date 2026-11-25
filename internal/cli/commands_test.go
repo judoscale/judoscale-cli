@@ -100,7 +100,7 @@ func TestEveryOperationRuns(t *testing.T) {
 						args = append(args, "--"+p.Name, "x")
 					}
 				}
-				if destructive(c.op) {
+				if c.op.Destructive {
 					args = append(args, "--yes")
 				}
 
