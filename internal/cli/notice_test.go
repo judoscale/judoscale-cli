@@ -70,7 +70,7 @@ func notifyRun(t *testing.T, dir string, api *noticeAPI, env map[string]string, 
 // currentETag is the ETag of the embedded snapshot, which is what the API
 // answers "not modified" to when there's no cached spec.
 func currentETag(t *testing.T) string {
-	etag := spec.ETag(t.TempDir())
+	etag := spec.ETag(t.TempDir(), "dev")
 	if etag == "" {
 		t.Skip("snapshot has no ETag")
 	}
@@ -119,6 +119,7 @@ func TestSpecNotice(t *testing.T) {
 	os.MkdirAll(cache, 0o700)
 	os.WriteFile(filepath.Join(cache, "openapi.json"), []byte("{}"), 0o600)
 	os.WriteFile(filepath.Join(cache, "openapi.etag"), []byte(`W/"newer"`), 0o600)
+	os.WriteFile(filepath.Join(cache, "openapi.cli-version"), []byte("1.0.0"), 0o600)
 	if out := notifyRun(t, dir, api, nil, "version"); out != "" {
 		t.Errorf("cache current: %q", out)
 	}

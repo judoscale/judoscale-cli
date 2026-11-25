@@ -181,9 +181,18 @@ func TestSnapshotParses(t *testing.T) {
 	}
 }
 
+// writeCache saves spec as the cache, as saved by CLI version savedBy ("" for none).
+func writeCache(t *testing.T, dir string, spec []byte, savedBy string) {
+	t.Helper()
+	os.WriteFile(filepath.Join(dir, cacheFile), spec, 0o644)
+	if savedBy != "" {
+		os.WriteFile(filepath.Join(dir, cacheVersionFile), []byte(savedBy), 0o644)
+	}
+}
+
 func TestLoadPrefersCache(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, cacheFile), mini(""), 0o644)
+	writeCache(t, dir, mini(""), "dev")
 
 	s, warn, err := Load(dir, "dev")
 	if err != nil || warn != "" {
@@ -203,7 +212,7 @@ func TestLoadFallsBackToSnapshot(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, cacheFile), mini("9.0.0"), 0o644)
+	writeCache(t, dir, mini("9.0.0"), "1.0.0")
 	s, warn, err = Load(dir, "1.0.0")
 	if err != nil || !strings.Contains(warn, "ignoring cached spec") || len(s.Operations) != len(snap.Operations) {
 		t.Fatalf("too-new cache: err=%v warn=%q", err, warn)
@@ -212,6 +221,36 @@ func TestLoadFallsBackToSnapshot(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, cacheFile), []byte("not json"), 0o644)
 	if _, warn, _ = Load(dir, "1.0.0"); !strings.Contains(warn, "ignoring cached spec") {
 		t.Errorf("corrupt cache warn = %q", warn)
+	}
+}
+
+func TestLoadDropsCacheFromOlderCLI(t *testing.T) {
+	for _, tc := range []struct {
+		savedBy, running string
+		kept             bool
+	}{
+		{"", "1.0.0", false}, // saved before versions were recorded
+		{"0.9.0", "1.0.0", false},
+		{"0.9.0", "0.10.0", false},
+		{"dev", "1.0.0", false},
+		{"1.0.0", "dev", false},
+		{"1.0.0", "1.0.0", true},
+		{"dev", "dev", true},
+		{"1.1.0", "1.0.0", true}, // downgrade
+	} {
+		dir := t.TempDir()
+		writeCache(t, dir, mini(""), tc.savedBy)
+		os.WriteFile(filepath.Join(dir, cacheETagFile), []byte(`W/"cached"`), 0o644)
+
+		etag := ETag(dir, tc.running)
+		s, warn, err := Load(dir, tc.running)
+		if err != nil || warn != "" {
+			t.Fatalf("%+v: err=%v warn=%q", tc, err, warn)
+		}
+		entries, _ := os.ReadDir(dir)
+		if kept := len(s.Operations) == 2; kept != tc.kept || (etag == `W/"cached"`) != tc.kept || (len(entries) > 0) != tc.kept {
+			t.Errorf("%+v: got %d ops, etag %q, files %v", tc, len(s.Operations), etag, entries)
+		}
 	}
 }
 
@@ -274,6 +313,14 @@ func TestUpdateUsesETag(t *testing.T) {
 	}
 	if got := strings.Join(conditional, "|"); got != "|"+etag {
 		t.Errorf("If-None-Match sent: %q", got)
+	}
+
+	// A newer CLI keeps an unchanged cache once it has checked it.
+	if _, _, changed, err := Update(context.Background(), srv.Client(), srv.URL, dir, "2.0.0"); err != nil || changed {
+		t.Fatalf("update from a newer CLI: changed=%v err=%v", changed, err)
+	}
+	if s, _, _ := Load(dir, "2.0.0"); len(s.Operations) != 2 {
+		t.Error("newer CLI dropped the cache it just checked")
 	}
 
 	// The ETag only counts alongside a cached spec.

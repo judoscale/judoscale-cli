@@ -70,7 +70,7 @@ func (a *App) cliUpdateNotice(ctx context.Context) string {
 // specUpdateNotice asks the API whether the spec in use is still current,
 // with a conditional request that doesn't download the spec.
 func (a *App) specUpdateNotice(ctx context.Context) string {
-	etag := spec.ETag(a.appDir())
+	etag := spec.ETag(a.appDir(), a.Version)
 	if etag == "" {
 		return ""
 	}

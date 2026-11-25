@@ -30,6 +30,8 @@ var snapshotETag string
 const (
 	cacheFile     = "openapi.json"
 	cacheETagFile = "openapi.etag"
+	// cacheVersionFile holds the version of the CLI that saved the cache.
+	cacheVersionFile = "openapi.cli-version"
 )
 
 type Spec struct {
@@ -326,11 +328,16 @@ func properties(s rawSchema, schemas map[string]rawSchema, nested bool) []Param 
 }
 
 // Load returns the cached spec if present and usable, else the embedded snapshot.
-// A cache that cannot be used is skipped and described in warning.
+// A cache saved by an older CLI is deleted, since its snapshot may be newer
+// than the cache. A cache that cannot be used is skipped and described in warning.
 func Load(configDir, cliVersion string) (s *Spec, warning string, err error) {
 	if configDir != "" {
 		data, readErr := os.ReadFile(filepath.Join(configDir, cacheFile))
 		switch {
+		case cacheOutdated(configDir, cliVersion):
+			for _, name := range []string{cacheFile, cacheETagFile, cacheVersionFile} {
+				os.Remove(filepath.Join(configDir, name))
+			}
 		case readErr == nil:
 			cached, parseErr := Parse(data, cliVersion)
 			if parseErr == nil {
@@ -368,6 +375,10 @@ func Update(ctx context.Context, httpClient *http.Client, baseURL, configDir, cl
 
 	if resp.StatusCode == http.StatusNotModified && cacheErr == nil {
 		s, err := Parse(cached, cliVersion)
+		if err == nil {
+			// The cache is current, so this CLI may keep using it.
+			err = writeAtomic(configDir, cacheVersionFile, []byte(cliVersion))
+		}
 		return s, path, false, err
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -400,6 +411,11 @@ func Update(ctx context.Context, httpClient *http.Client, baseURL, configDir, cl
 			err = nil
 		}
 	}
+	if err == nil {
+		// Written last: if anything above fails, the cache stays marked as
+		// older and Load drops it.
+		err = writeAtomic(configDir, cacheVersionFile, []byte(cliVersion))
+	}
 	if err != nil {
 		return nil, "", false, err
 	}
@@ -407,9 +423,9 @@ func Update(ctx context.Context, httpClient *http.Client, baseURL, configDir, cl
 }
 
 // ETag returns the ETag of the spec in use: the cached copy's, or the
-// snapshot's when there is no cache. It is "" when unknown.
-func ETag(configDir string) string {
-	if configDir != "" {
+// snapshot's when there is no usable cache. It is "" when unknown.
+func ETag(configDir, cliVersion string) string {
+	if configDir != "" && !cacheOutdated(configDir, cliVersion) {
 		if _, err := os.Stat(filepath.Join(configDir, cacheFile)); err == nil {
 			return readETag(configDir)
 		}
@@ -417,9 +433,24 @@ func ETag(configDir string) string {
 	return strings.TrimSpace(snapshotETag)
 }
 
+// cacheOutdated reports whether the cache was saved by an older CLI, whose
+// snapshot this CLI's may have replaced. A cache from a newer CLI is kept, as
+// x-min-cli-version covers it. A cache saved before versions were recorded, or
+// by a build with an unparseable version such as "dev", is only kept by that
+// same version.
+func cacheOutdated(configDir, cliVersion string) bool {
+	saved := readText(configDir, cacheVersionFile)
+	return saved != cliVersion && !IsNewer(saved, cliVersion)
+}
+
 // readETag returns the ETag saved with the cached spec, or "".
 func readETag(configDir string) string {
-	data, err := os.ReadFile(filepath.Join(configDir, cacheETagFile))
+	return readText(configDir, cacheETagFile)
+}
+
+// readText returns the trimmed contents of configDir/name, or "".
+func readText(configDir, name string) string {
+	data, err := os.ReadFile(filepath.Join(configDir, name))
 	if err != nil {
 		return ""
 	}

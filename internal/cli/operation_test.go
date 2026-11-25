@@ -240,6 +240,7 @@ func TestResourceOrder(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "judoscale"), 0o755)
 	os.WriteFile(filepath.Join(dir, "judoscale", "openapi.json"), []byte(cached), 0o644)
+	os.WriteFile(filepath.Join(dir, "judoscale", "openapi.cli-version"), []byte("dev"), 0o644)
 
 	help := runIn(t, dir, nil, nil, "").stdout
 	last := -1
