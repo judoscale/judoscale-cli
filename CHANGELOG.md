@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.6](https://github.com/judoscale/judoscale-cli/compare/v0.0.5...v0.0.6) (2026-11-25)
+
+
+### Features
+
+* add scale override commands and read destructive operations from the API spec ([#10](https://github.com/judoscale/judoscale-cli/issues/10)) ([0381a45](https://github.com/judoscale/judoscale-cli/commit/0381a45ee8d3f16b0c2983697c01adebc25d4372))
+
+
+### Bug Fixes
+
+* drop a cached spec saved by an older CLI release ([#11](https://github.com/judoscale/judoscale-cli/issues/11)) ([2c19dbd](https://github.com/judoscale/judoscale-cli/commit/2c19dbd708795d30f10c8020e8a0c0620cd02b81))
+
 ## [0.0.5](https://github.com/judoscale/judoscale-cli/compare/v0.0.4...v0.0.5) (2026-11-05)
 
 
