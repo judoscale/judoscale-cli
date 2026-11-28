@@ -3297,15 +3297,11 @@
             "type": "integer"
           },
           "scale_direction": {
-            "description": "Null when the scale did not change.",
-            "type": [
-              "string",
-              "null"
-            ],
+            "description": "Whether the instance count went up or down.",
+            "type": "string",
             "enum": [
               "up",
-              "down",
-              null
+              "down"
             ]
           },
           "source": {
